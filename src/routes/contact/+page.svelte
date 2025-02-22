@@ -1,32 +1,34 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
-  import { supabaseClient } from '$lib/supabaseClient';
+  import { MetaTags } from 'svelte-meta-tags';
   import Loading from '$lib/components/Loading.svelte';
 
   let contacts = [];
   let socialMedia = [];
   let loading = true;
+  let error = null;
 
   onMount(async () => {
     try {
-      // Fetch contacts
-      const { data: contactsData, error: contactsError } = await supabaseClient
-        .from('contacts')
-        .select('*');
+      // Fetch contacts dan social media secara parallel
+      const [contactsRes, socialMediaRes] = await Promise.all([
+        fetch('/api/contact/contacts'),
+        fetch('/api/contact/social-media')
+      ]);
       
-      if (contactsError) throw contactsError;
+      const [contactsData, socialMediaData] = await Promise.all([
+        contactsRes.json(),
+        socialMediaRes.json()
+      ]);
+      
+      if (!contactsRes.ok) throw new Error(contactsData.error);
+      if (!socialMediaRes.ok) throw new Error(socialMediaData.error);
+      
       contacts = contactsData;
-      
-      // Fetch social media
-      const { data: socialData, error: socialError } = await supabaseClient
-        .from('social_media') 
-        .select('*');
-        
-      if (socialError) throw socialError;
-      socialMedia = socialData;
-      
-    } catch (error) {
-      console.error('Error fetching data:', error.message);
+      socialMedia = socialMediaData;
+    } catch (err) {
+      error = err.message;
+      console.error('Error:', err);
     } finally {
       loading = false;
     }

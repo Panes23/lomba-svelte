@@ -1,10 +1,10 @@
-<script>
+<script lang="ts">
   import { writable } from 'svelte/store';
   import MarketButton from './MarketButton.svelte';
   import { fade, scale } from 'svelte/transition';
-  import { supabaseClient } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
   import Skeleton from './Skeleton.svelte';
+  import { goto } from '$app/navigation';
   
   let markets = [];
   let searchQuery = '';
@@ -15,20 +15,29 @@
 
   onMount(async () => {
     try {
-      const { data, error } = await supabaseClient
-        .from('markets')
-        .select('*');
+      const response = await fetch('/api/markets');
+      const data = await response.json();
       
-      if (error) throw error;
+      if (!response.ok) throw new Error(data.error);
       
       markets = data;
-      filteredMarkets = data;
-    } catch (error) {
-      console.error('Error fetching markets:', error.message);
+      filteredMarkets = markets;
+    } catch (err) {
+      console.error('Error:', err);
     } finally {
       loading = false;
     }
   });
+
+  $: {
+    if (searchQuery) {
+      filteredMarkets = markets.filter(market => 
+        market.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    } else {
+      filteredMarkets = markets;
+    }
+  }
 
   function handleSearch(event) {
     searchQuery = event.target.value.toLowerCase();
@@ -58,6 +67,18 @@
   function handleCloseTerms() {
     showTerms = false;
     selectedMarket = null;
+  }
+
+  function handleMarketClick(market) {
+    selectedMarket = market;
+    showTerms = true;
+  }
+
+  function handleAcceptTerms() {
+    if (selectedMarket) {
+      goto(`/lomba/${selectedMarket.id}`);
+    }
+    showTerms = false;
   }
 </script>
 
@@ -164,17 +185,20 @@
                 className="hover:bg-gray-700 text-sm font-medium tracking-wide py-3"
                 on:click={() => handleShowTerms(market)}
               />
-              <MarketButton 
-                text="LINK RESMI" 
-                variant="success" 
-                className="hover:-translate-y-0.5 transform transition-transform text-sm font-medium tracking-wide py-3 shadow-lg"
-                on:click={() => window.open(market.officialLink, '_blank')}
-              />
-              <MarketButton 
-                text="IKUTI LOMBA" 
-                variant="primary" 
-                className="hover:-translate-y-0.5 transform transition-transform text-sm font-medium tracking-wide py-3 shadow-lg"
-              />
+              <a 
+                href={market.officiallink}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="block w-full text-center bg-green-600 text-white py-3 rounded-lg hover:-translate-y-0.5 transform transition-transform text-sm font-medium tracking-wide shadow-lg hover:bg-green-700"
+              >
+                LINK RESMI
+              </a>
+              <a 
+                href={`/lomba/${market.name}`}
+                class="block w-full text-center bg-[#e62020] text-white py-3 rounded-lg hover:-translate-y-0.5 transform transition-transform text-sm font-medium tracking-wide shadow-lg hover:bg-[#ff0000]"
+              >
+                IKUTI LOMBA
+              </a>
             </div>
           </div>
         </div>
