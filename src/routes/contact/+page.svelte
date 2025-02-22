@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { MetaTags } from 'svelte-meta-tags';
-  import Loading from '$lib/components/Loading.svelte';
 
   let contacts = [];
   let socialMedia = [];
@@ -87,7 +86,44 @@
 
     <!-- Loading State -->
     {#if loading}
-      <Loading size={8} color="#e62020" />
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Contact Info Skeleton -->
+        <div class="bg-[#1a1a1a] p-6 rounded-2xl border border-gray-800">
+          <div class="h-7 w-48 bg-gray-800 rounded-lg mb-6 animate-pulse" />
+          <div class="space-y-4">
+            {#each Array(4) as _}
+              <div class="flex items-center gap-3 p-4 rounded-xl bg-[#222] border border-gray-800/50 animate-pulse">
+                <div class="w-6 h-6 bg-gray-800 rounded-full" />
+                <div class="h-5 w-48 bg-gray-800 rounded-lg" />
+              </div>
+            {/each}
+          </div>
+        </div>
+
+        <!-- Social Media Skeleton -->
+        <div class="bg-[#1a1a1a] p-6 rounded-2xl border border-gray-800">
+          <div class="h-7 w-48 bg-gray-800 rounded-lg mb-6 animate-pulse" />
+          <div class="grid grid-cols-2 gap-4">
+            {#each Array(4) as _}
+              <div class="flex items-center gap-3 p-4 rounded-xl bg-[#222] border border-gray-800/50 animate-pulse">
+                <div class="w-10 h-10 rounded-full bg-gray-800" />
+                <div class="h-5 w-20 bg-gray-800 rounded-lg" />
+              </div>
+            {/each}
+          </div>
+        </div>
+      </div>
+
+      <!-- Operating Hours Skeleton -->
+      <div class="max-w-3xl mx-auto mt-16 text-center animate-pulse">
+        <div class="h-8 w-48 bg-gray-800 rounded-lg mx-auto mb-4" />
+        <div class="h-6 w-96 bg-gray-800 rounded-lg mx-auto" />
+      </div>
+
+      <!-- Response Time Skeleton -->
+      <div class="max-w-3xl mx-auto mt-12 p-6 bg-[#222] rounded-xl text-center animate-pulse">
+        <div class="h-5 w-3/4 bg-gray-800 rounded-lg mx-auto" />
+      </div>
     {:else}
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <!-- Contact Info -->
@@ -146,26 +182,26 @@
           </div>
         </div>
       </div>
+
+      <!-- Operating Hours -->
+      <div 
+        class="max-w-3xl mx-auto mt-16 text-center"
+      >
+        <h2 class="text-2xl font-bold text-white mb-4">Jam Operasional</h2>
+        <p class="text-gray-400 text-lg">
+          Customer service kami beroperasi 24 jam setiap hari, termasuk hari libur nasional.
+        </p>
+      </div>
+
+      <!-- Response Time -->
+      <div 
+        class="max-w-3xl mx-auto mt-12 p-6 bg-[#222] rounded-xl text-center"
+      >
+        <p class="text-gray-400">
+          <span class="text-white font-semibold">Waktu Respon:</span> Kami akan merespon pesan Anda dalam waktu maksimal 5 menit.
+        </p>
+      </div>
     {/if}
-
-    <!-- Operating Hours -->
-    <div 
-      class="max-w-3xl mx-auto mt-16 text-center {loading ? 'opacity-0' : 'opacity-100'} transition-all duration-700 delay-700"
-    >
-      <h2 class="text-2xl font-bold text-white mb-4">Jam Operasional</h2>
-      <p class="text-gray-400 text-lg">
-        Customer service kami beroperasi 24 jam setiap hari, termasuk hari libur nasional.
-      </p>
-    </div>
-
-    <!-- Response Time -->
-    <div 
-      class="max-w-3xl mx-auto mt-12 p-6 bg-[#222] rounded-xl text-center {loading ? 'opacity-0' : 'opacity-100'} transition-all duration-700 delay-800"
-    >
-      <p class="text-gray-400">
-        <span class="text-white font-semibold">Waktu Respon:</span> Kami akan merespon pesan Anda dalam waktu maksimal 5 menit.
-      </p>
-    </div>
   </div>
 </div>
 

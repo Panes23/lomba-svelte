@@ -13,11 +13,44 @@
   let loading = true;
   let lomba: Lomba[] = [];
   let market: Market | null = null;
-  let marketName = $page.params.market;
+  $: marketName = $page.params.market;
   let selectedDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
   let error = null;
   let guessNumber = '';
   let submitting = false;
+
+  function getMarketStatus(market: Market) {
+    const openTime = parseInt(market.buka.replace(':', ''));
+    const closeTime = parseInt(market.tutup.replace(':', ''));
+    const now = new Date();
+    const currentTime = now.getHours() * 100 + now.getMinutes();
+    
+    if (currentTime < openTime) return { text: 'BELUM DIMULAI', color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/20' };
+    if (currentTime >= openTime && currentTime < closeTime) return { text: 'BUKA', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-400/20' };
+    return { text: 'TUTUP', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20' };
+  }
+
+  // Fungsi untuk memuat ulang data
+  async function reloadData() {
+    try {
+      loading = true;
+      error = null;
+      
+      const marketRes = await fetch(`/api/market/${marketName}`);
+      const marketData = await marketRes.json();
+      
+      if (!marketRes.ok) throw new Error(marketData.error);
+      
+      market = marketData;
+      
+      await fetchLomba();
+    } catch (err) {
+      error = err.message;
+      console.error('Error:', err);
+    } finally {
+      loading = false;
+    }
+  }
 
   async function fetchLomba() {
     try {
@@ -36,22 +69,13 @@
   }
 
   onMount(async () => {
-    try {
-      const marketRes = await fetch(`/api/market/${marketName}`);
-      const marketData = await marketRes.json();
-      
-      if (!marketRes.ok) throw new Error(marketData.error);
-      
-      market = marketData;
-      
-      await fetchLomba();
-    } catch (err) {
-      error = err.message;
-      console.error('Error:', err);
-    } finally {
-      loading = false;
-    }
+    await reloadData();
   });
+
+  // Reaktif terhadap perubahan marketName
+  $: if (marketName) {
+    reloadData();
+  }
 
   async function handleSubmit(lombaId: string) {
     if (!$user) {
@@ -129,13 +153,71 @@
   }}
 />
 
-<div class="min-h-screen bg-[#1a1a1a] pt-24 pb-16">
-  <div class="container mx-auto px-4">
-    {#if loading}
-      <div class="flex justify-center">
-        <Loading size={8} color="#e62020" />
+<!-- Skeleton Loading -->
+{#if loading}
+  <div class="min-h-screen bg-[#1a1a1a] pt-24 pb-16">
+    <div class="container mx-auto px-4">
+      <!-- Header Skeleton -->
+      <div class="mb-12 text-center animate-pulse">
+        <div class="relative mx-auto mb-8 h-40 w-40 overflow-hidden rounded-full bg-gray-800" />
+        <div class="h-8 w-64 mx-auto bg-gray-800 rounded-lg mb-4" />
+        <div class="mx-auto flex max-w-sm justify-center gap-8 text-center">
+          <div class="flex-1">
+            <div class="h-4 w-20 bg-gray-800 rounded mb-2 mx-auto" />
+            <div class="h-6 w-16 bg-gray-800 rounded mx-auto" />
+          </div>
+          <div class="flex-1">
+            <div class="h-4 w-20 bg-gray-800 rounded mb-2 mx-auto" />
+            <div class="h-6 w-16 bg-gray-800 rounded mx-auto" />
+          </div>
+        </div>
       </div>
-    {:else if market}
+
+      <!-- Filter Skeleton -->
+      <div class="mb-8">
+        <div class="mx-auto max-w-sm">
+          <div class="h-14 bg-gray-800 rounded-lg animate-pulse" />
+        </div>
+      </div>
+
+      <!-- Lomba Cards Skeleton -->
+      <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {#each Array(6) as _}
+          <div class="relative overflow-hidden rounded-xl border border-gray-800 bg-[#222] p-6 animate-pulse">
+            <!-- Badge Skeleton -->
+            <div class="absolute right-0 top-0 w-16 h-6 rounded-bl-lg bg-gray-800" />
+
+            <div class="mb-6 space-y-4">
+              <div>
+                <div class="h-4 w-16 bg-gray-800 rounded mb-2" />
+                <div class="h-6 w-48 bg-gray-800 rounded" />
+              </div>
+
+              <div>
+                <div class="h-4 w-16 bg-gray-800 rounded mb-2" />
+                <div class="h-8 w-32 bg-gray-800 rounded" />
+              </div>
+
+              <div>
+                <div class="h-4 w-32 bg-gray-800 rounded mb-2" />
+                <div class="h-6 w-24 bg-gray-800 rounded" />
+              </div>
+            </div>
+
+            <!-- Button Skeleton -->
+            <div class="h-12 w-full bg-gray-800 rounded-lg" />
+          </div>
+        {/each}
+      </div>
+    </div>
+  </div>
+{:else if error}
+  <div class="text-center text-gray-400">
+    {error}
+  </div>
+{:else if market}
+  <div class="min-h-screen bg-[#1a1a1a] pt-24 pb-16">
+    <div class="container mx-auto px-4">
       <!-- Header Section -->
       <div class="mb-12 text-center">
         <div class="relative mx-auto mb-8 h-40 w-40 overflow-hidden rounded-full border-4 border-[#e62020]/20">
@@ -148,6 +230,18 @@
         <h1 class="mb-4 text-4xl font-bold text-white md:text-5xl">
           Lomba {market.name}
         </h1>
+        
+        <!-- Market Status -->
+        {#if market}
+          {@const status = getMarketStatus(market)}
+          <div class="mb-6 flex justify-center">
+            <div class="flex items-center gap-2 rounded-lg {status.bg} {status.border} border px-4 py-2">
+              <span class="h-2 w-2 rounded-full animate-pulse" class:bg-yellow-400={status.text === 'BELUM DIMULAI'} class:bg-green-400={status.text === 'BUKA'} class:bg-red-400={status.text === 'TUTUP'}></span>
+              <span class="{status.color} font-medium">{status.text}</span>
+            </div>
+          </div>
+        {/if}
+        
         <div class="mx-auto flex max-w-sm justify-center gap-8 text-center">
           <div>
             <p class="text-sm font-medium uppercase tracking-wider text-gray-400">Jam Buka</p>
@@ -229,10 +323,10 @@
           Belum ada lomba tersedia untuk tanggal {new Date(selectedDate).toLocaleDateString('id-ID')}
         </div>
       {/if}
-    {:else}
-      <div class="text-center text-gray-400">
-        Pasaran {marketName} tidak ditemukan
-      </div>
-    {/if}
+    </div>
   </div>
-</div> 
+{:else}
+  <div class="text-center text-gray-400">
+    Pasaran {marketName} tidak ditemukan
+  </div>
+{/if} 
