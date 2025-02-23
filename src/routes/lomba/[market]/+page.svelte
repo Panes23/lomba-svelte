@@ -90,6 +90,36 @@
   }
 </script>
 
+<style>
+  @keyframes pulse-border {
+    0% { border-color: rgba(255, 255, 255, 0.1); }
+    50% { border-color: rgba(255, 255, 255, 0.3); }
+    100% { border-color: rgba(255, 255, 255, 0.1); }
+  }
+
+  @keyframes shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  @keyframes bounce-right {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(3px); }
+  }
+
+  :global(.animate-pulse-border) {
+    animation: pulse-border 2s infinite;
+  }
+
+  :global(.animate-shine) {
+    animation: shine 3s infinite;
+  }
+
+  :global(.animate-bounce-right) {
+    animation: bounce-right 1s infinite;
+  }
+</style>
+
 <MetaTags
   title={market ? `Lomba ${market.name} - Tebak Angka Berhadiah` : 'Lomba Tebak Angka'}
   titleTemplate="%s | TEBAK ANGKA"
@@ -217,7 +247,7 @@
                 </div>
 
                 <div>
-                  <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Maksimal Pemenang</p>
+                  <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Total Pemenang</p>
                   <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">
                     {item.max_winner} orang
                   </p>
@@ -229,20 +259,9 @@
                     <p class="text-3xl font-bold text-green-400">{item.result}</p>
                   </div>
                 {:else}
-                  <div class="pt-4">
-                    <input
-                      type="number"
-                      bind:value={guessNumber}
-                      placeholder="Masukkan tebakan..."
-                      class="w-full rounded-lg bg-[#1a1a1a] px-4 py-3 text-white border border-gray-800 mb-4 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent transition-all duration-300"
-                    />
-                    <button
-                      on:click={() => handleSubmit(lombaId)}
-                      disabled={submitting}
-                      class="w-full transform rounded-lg bg-gradient-to-r from-[#e62020] to-[#ff0000] py-3 font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#e62020]/20 hover:from-[#ff0000] hover:to-[#e62020] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {submitting ? 'Memproses...' : 'Kirim Tebakan'}
-                    </button>
+                  <div>
+                    <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1 mt-6">Hasil</p>
+                    <p class="text-lg font-medium text-yellow-500">Belum Result</p>
                   </div>
                 {/if}
               </div>
@@ -250,9 +269,38 @@
               <!-- Tombol Ikuti Lomba -->
               <a
                 href="/tebakan/{lombaId}"
-                class="mt-6 block w-full transform rounded-lg bg-gradient-to-r from-[#e62020] to-[#ff0000] px-4 py-3 text-center font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#e62020]/20 hover:from-[#ff0000] hover:to-[#e62020]"
+                class={`
+                  mt-6 block w-full transform rounded-lg px-4 py-3 text-center font-semibold 
+                  text-white transition-all duration-300 relative overflow-hidden
+                  ${item.result === null && getMarketStatus(market).text === 'BUKA' 
+                    ? 'bg-gradient-to-r from-[#e62020] to-[#ff0000] hover:from-[#ff0000] hover:to-[#e62020] before:absolute before:inset-0 before:border-2 before:border-white/20 before:rounded-lg before:animate-pulse-border after:absolute after:inset-0 after:bg-gradient-to-r after:from-white/10 after:to-transparent after:animate-shine after:-translate-x-full hover:after:translate-x-full after:transition-transform after:duration-1000'
+                    : 'bg-gradient-to-r from-[#e62020] to-[#ff0000] hover:from-[#ff0000] hover:to-[#e62020]'
+                  }
+                  hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#e62020]/20 
+                  group
+                `}
               >
-                Ikuti Lomba
+                <span class="relative z-10 inline-flex items-center gap-2">
+                  {item.result !== null || getMarketStatus(market).text !== 'BUKA' 
+                    ? 'Detail Lomba' 
+                    : 'Ikuti Lomba'
+                  }
+                  {#if item.result === null && getMarketStatus(market).text === 'BUKA'}
+                    <svg 
+                      class="w-4 h-4 animate-bounce-right" 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path 
+                        stroke-linecap="round" 
+                        stroke-linejoin="round" 
+                        stroke-width="2" 
+                        d="M13 7l5 5m0 0l-5 5m5-5H6"
+                      />
+                    </svg>
+                  {/if}
+                </span>
               </a>
             </div>
           {/each}

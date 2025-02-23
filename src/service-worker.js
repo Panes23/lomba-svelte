@@ -42,6 +42,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
+  // Skip caching untuk request dengan no-store
+  const url = new URL(event.request.url);
+  // Skip caching untuk halaman utama dan tebakan
+  if (url.pathname === '/' || url.pathname.startsWith('/tebakan/')) {
+    return event.respondWith(fetch(event.request));
+  }
+
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
@@ -54,7 +61,10 @@ self.addEventListener('fetch', (event) => {
       try {
         const response = await fetch(event.request);
         
-        if (response.status === 200) {
+        // Hanya cache response yang valid dan bukan dari halaman dinamis
+        if (response.status === 200 && 
+            !response.headers.get('Cache-Control')?.includes('no-store') &&
+            !url.pathname.startsWith('/lomba/')) {
           cache.put(event.request, response.clone());
         }
         

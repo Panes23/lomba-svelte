@@ -2,53 +2,98 @@ import { error } from '@sveltejs/kit';
 import { supabaseClient } from '$lib/supabaseClient';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, setHeaders }) => {
+  // Set headers untuk mencegah caching
+  setHeaders({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    // Gunakan Vary header yang spesifik
+    'Vary': 'Accept, Accept-Encoding'
+  });
+
   try {
-    // Fetch lomba detail dengan relasi markets
-    const { data: lomba, error: lombaError } = await supabaseClient
+    // Tambahkan timestamp untuk memaksa query baru
+    const timestamp = new Date().getTime();
+    
+    // Validasi lombaid
+    if (!params.lombaId) {
+      throw error(400, 'ID Lomba tidak valid');
+    }
+    
+    // Ambil data lomba terlebih dahulu
+    const { data: lombaData, error: lombaError } = await supabaseClient
       .from('lomba')
       .select(`
         *,
         markets (
+          id,
           name,
           buka,
           tutup,
           image
         )
       `)
-      .eq('id', params.lombaId)  // Pastikan menggunakan ID dari params
-      .single();  // Karena kita hanya butuh satu lomba
+      .eq('id', params.lombaId)
+      .single();
 
-    if (lombaError) throw lombaError;
-    if (!lomba) throw error(404, 'Lomba tidak ditemukan');
-    // Fetch websites
+    if (lombaError) {
+      console.error('Error fetching lomba:', lombaError);
+      throw error(500, 'Gagal memuat data lomba');
+    }
+    
+    if (!lombaData) {
+      throw error(404, 'Lomba tidak ditemukan');
+    }
+    
+    if (!lombaData.markets) {
+      console.error('Market data missing for lomba:', lombaData);
+      throw error(500, 'Data market tidak ditemukan');
+    }
+
+    // Ambil daftar website
     const { data: websites, error: websitesError } = await supabaseClient
       .from('websites')
-      .select('*');
+      .select('*')
+      .order('nama');
 
-    if (websitesError) throw websitesError;
+    if (websitesError) {
+      console.error('Error fetching websites:', websitesError);
+      throw websitesError;
+    }
 
-    // Fetch tebakan untuk lomba ini
+    // Ambil daftar tebakan untuk lomba ini
     const { data: tebakan, error: tebakanError } = await supabaseClient
       .from('tebakan')
       .select(`
         *,
         websites (
-          nama
+          id,
+          nama,
+          link_website,
+          color
         )
       `)
-      .eq('lomba_id', params.lombaId)  // Filter berdasarkan lomba_id
-      .order('created_at', { ascending: false });
+      .eq('lomba_id', params.lombaId)
+      .order('created_at', { ascending: false })
+      .limit(1000);
 
-    if (tebakanError) throw tebakanError;
+    if (tebakanError) {
+      console.error('Error fetching tebakan:', tebakanError);
+      throw tebakanError;
+    }
 
     return {
-      lomba,
+      lomba: lombaData,
       websites: websites || [],
-      tebakan: tebakan || []
+      tebakan: tebakan || [],
+      timestamp
     };
   } catch (err) {
     console.error('Error loading tebakan data:', err);
+    if (err instanceof Error) {
+      throw error(500, err.message);
+    }
     throw error(500, 'Gagal memuat data');
   }
 }; 
