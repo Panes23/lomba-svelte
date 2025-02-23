@@ -14,29 +14,14 @@
     try {
       loading = true;
       
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          identifier,
-          password
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error);
-      }
+      const { error } = await user.signIn(identifier, password);
 
-      user.set(data.user);
-      await invalidate('supabase:auth');
-
+      if (error) throw error;
       goto('/');
-    } catch (err) {
-      error = err.message;
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      }
     } finally {
       loading = false;
     }

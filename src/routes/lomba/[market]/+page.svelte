@@ -2,19 +2,17 @@
   import { page } from '$app/stores';
   import { user } from '$lib/stores/authStore';
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
   import Loading from '$lib/components/Loading.svelte';
   import type { Market } from '$lib/types/market';
   import type { Lomba } from '$lib/types/lomba';
   import { MetaTags } from 'svelte-meta-tags';
 
   export let data;
+  $: ({ market, lomba, selectedDate } = data);
 
-  let loading = true;
-  let lomba: Lomba[] = [];
-  let market: Market | null = null;
+  // Gunakan $page.params.market untuk URL
   $: marketName = $page.params.market;
-  let selectedDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+
   let error = null;
   let guessNumber = '';
   let submitting = false;
@@ -30,51 +28,17 @@
     return { text: 'TUTUP', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20' };
   }
 
-  // Fungsi untuk memuat ulang data
-  async function reloadData() {
+  // Fungsi untuk memperbarui data lomba
+  async function refreshLomba() {
     try {
-      loading = true;
-      error = null;
-      
-      const marketRes = await fetch(`/api/market/${marketName}`);
-      const marketData = await marketRes.json();
-      
-      if (!marketRes.ok) throw new Error(marketData.error);
-      
-      market = marketData;
-      
-      await fetchLomba();
-    } catch (err) {
-      error = err.message;
-      console.error('Error:', err);
-    } finally {
-      loading = false;
-    }
-  }
-
-  async function fetchLomba() {
-    try {
-      if (!market) return;
-      
       const response = await fetch(`/api/lomba/${market.id}?date=${selectedDate}`);
       const data = await response.json();
-      
       if (!response.ok) throw new Error(data.error);
-  
       lomba = data;
     } catch (err) {
+      console.error('Error refreshing lomba:', err);
       error = err.message;
-      console.error('Error:', err);
     }
-  }
-
-  onMount(async () => {
-    await reloadData();
-  });
-
-  // Reaktif terhadap perubahan marketName
-  $: if (marketName) {
-    reloadData();
   }
 
   async function handleSubmit(lombaId: string) {
@@ -102,7 +66,7 @@
       if (!response.ok) throw new Error(data.error);
       
       // Refresh lomba list after successful submission
-      await fetchLomba();
+      await refreshLomba();
       guessNumber = '';
     } catch (err) {
       error = err.message;
@@ -154,64 +118,7 @@
 />
 
 <!-- Skeleton Loading -->
-{#if loading}
-  <div class="min-h-screen bg-[#1a1a1a] pt-24 pb-16">
-    <div class="container mx-auto px-4">
-      <!-- Header Skeleton -->
-      <div class="mb-12 text-center animate-pulse">
-        <div class="relative mx-auto mb-8 h-40 w-40 overflow-hidden rounded-full bg-gray-800" />
-        <div class="h-8 w-64 mx-auto bg-gray-800 rounded-lg mb-4" />
-        <div class="mx-auto flex max-w-sm justify-center gap-8 text-center">
-          <div class="flex-1">
-            <div class="h-4 w-20 bg-gray-800 rounded mb-2 mx-auto" />
-            <div class="h-6 w-16 bg-gray-800 rounded mx-auto" />
-          </div>
-          <div class="flex-1">
-            <div class="h-4 w-20 bg-gray-800 rounded mb-2 mx-auto" />
-            <div class="h-6 w-16 bg-gray-800 rounded mx-auto" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Filter Skeleton -->
-      <div class="mb-8">
-        <div class="mx-auto max-w-sm">
-          <div class="h-14 bg-gray-800 rounded-lg animate-pulse" />
-        </div>
-      </div>
-
-      <!-- Lomba Cards Skeleton -->
-      <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {#each Array(6) as _}
-          <div class="relative overflow-hidden rounded-xl border border-gray-800 bg-[#222] p-6 animate-pulse">
-            <!-- Badge Skeleton -->
-            <div class="absolute right-0 top-0 w-16 h-6 rounded-bl-lg bg-gray-800" />
-
-            <div class="mb-6 space-y-4">
-              <div>
-                <div class="h-4 w-16 bg-gray-800 rounded mb-2" />
-                <div class="h-6 w-48 bg-gray-800 rounded" />
-              </div>
-
-              <div>
-                <div class="h-4 w-16 bg-gray-800 rounded mb-2" />
-                <div class="h-8 w-32 bg-gray-800 rounded" />
-              </div>
-
-              <div>
-                <div class="h-4 w-32 bg-gray-800 rounded mb-2" />
-                <div class="h-6 w-24 bg-gray-800 rounded" />
-              </div>
-            </div>
-
-            <!-- Button Skeleton -->
-            <div class="h-12 w-full bg-gray-800 rounded-lg" />
-          </div>
-        {/each}
-      </div>
-    </div>
-  </div>
-{:else if error}
+{#if error}
   <div class="text-center text-gray-400">
     {error}
   </div>
@@ -219,51 +126,60 @@
   <div class="min-h-screen bg-[#1a1a1a] pt-24 pb-16">
     <div class="container mx-auto px-4">
       <!-- Header Section -->
-      <div class="mb-12 text-center">
-        <div class="relative mx-auto mb-8 h-40 w-40 overflow-hidden rounded-full border-4 border-[#e62020]/20">
-          <img
-            src={market.image}
-            alt={market.name}
-            class="h-full w-full object-cover"
-          />
-        </div>
-        <h1 class="mb-4 text-4xl font-bold text-white md:text-5xl">
-          Lomba {market.name}
-        </h1>
-        
-        <!-- Market Status -->
-        {#if market}
-          {@const status = getMarketStatus(market)}
-          <div class="mb-6 flex justify-center">
-            <div class="flex items-center gap-2 rounded-lg {status.bg} {status.border} border px-4 py-2">
-              <span class="h-2 w-2 rounded-full animate-pulse" class:bg-yellow-400={status.text === 'BELUM DIMULAI'} class:bg-green-400={status.text === 'BUKA'} class:bg-red-400={status.text === 'TUTUP'}></span>
-              <span class="{status.color} font-medium">{status.text}</span>
+      <div class="relative mb-16">
+        <!-- Decorative Background -->
+        <div class="absolute inset-0 bg-gradient-to-b from-[#e62020]/5 to-transparent" />
+        <div class="absolute -top-20 left-1/2 w-full max-w-[500px] aspect-square bg-[#e62020]/5 rounded-full blur-3xl transform -translate-x-1/2" />
+      
+        <div class="relative container mx-auto px-4 pt-8 pb-12 overflow-hidden">
+          <div class="relative mx-auto mb-8 h-40 w-40 overflow-hidden rounded-full border-4 border-[#e62020]/20">
+            <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/20 to-transparent blur-xl" />
+            <img
+              src={market.image}
+              alt={market.name}
+              class="relative h-full w-full object-cover transform hover:scale-110 transition-transform duration-500"
+            />
+          </div>
+          
+          <h1 class="mb-6 text-center text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
+            Lomba {market.name}
+          </h1>
+
+          <!-- Market Status -->
+          {#if market}
+            {@const status = getMarketStatus(market)}
+            <div class="mb-6 md:mb-8 flex justify-center">
+              <div class="flex items-center gap-2 rounded-lg {status.bg} {status.border} border px-4 py-2">
+                <span class="h-2 w-2 rounded-full animate-pulse" class:bg-yellow-400={status.text === 'BELUM DIMULAI'} class:bg-green-400={status.text === 'BUKA'} class:bg-red-400={status.text === 'TUTUP'}></span>
+                <span class="{status.color} font-medium">{status.text}</span>
+              </div>
             </div>
-          </div>
-        {/if}
-        
-        <div class="mx-auto flex max-w-sm justify-center gap-8 text-center">
-          <div>
-            <p class="text-sm font-medium uppercase tracking-wider text-gray-400">Jam Buka</p>
-            <p class="text-xl font-bold text-white">{market.buka}</p>
-          </div>
-          <div>
-            <p class="text-sm font-medium uppercase tracking-wider text-gray-400">Jam Tutup</p>
-            <p class="text-xl font-bold text-white">{market.tutup}</p>
+          {/if}
+
+          <!-- Market Schedule -->
+          <div class="mx-auto flex max-w-sm justify-center gap-6 md:gap-12 text-center">
+            <div>
+              <p class="text-sm font-medium uppercase tracking-wider text-gray-400 mb-2">Jam Buka</p>
+              <p class="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.buka}</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium uppercase tracking-wider text-gray-400 mb-2">Jam Tutup</p>
+              <p class="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.tutup}</p>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Filter Section -->
-      <div class="mb-8">
-        <div class="mx-auto max-w-sm">
+      <div class="mb-12">
+        <div class="mx-auto max-w-md px-4">
           <div class="flex items-center gap-4 rounded-lg bg-[#222] p-4">
-            <label class="text-sm font-medium text-gray-400">Pilih Tanggal:</label>
+            <label class="text-xs md:text-sm font-medium uppercase tracking-wider text-gray-400">Pilih Tanggal:</label>
             <input
               type="date"
               bind:value={selectedDate}
-              on:change={fetchLomba}
-              class="flex-1 rounded-lg bg-[#1a1a1a] px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#e62020]"
+              on:change={refreshLomba}
+              class="flex-1 rounded-lg bg-[#1a1a1a] px-3 md:px-4 py-2 md:py-3 text-sm md:text-base text-white border border-gray-800 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent transition-all duration-300"
             />
           </div>
         </div>
@@ -271,50 +187,73 @@
 
       <!-- Lomba Cards -->
       {#if lomba.length > 0}
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 container mx-auto px-4">
           {#each lomba as item}
-            <div class="relative overflow-hidden rounded-xl border border-gray-800 bg-[#222] p-6">
+            {@const lombaId = item.id}
+            <div class="group relative overflow-hidden rounded-xl border border-gray-800/50 bg-gradient-to-br from-[#1a1a1a] to-[#222] p-6 hover:border-[#e62020]/30 transition-all duration-300 shadow-xl shadow-black/20 backdrop-blur-sm">
+              <!-- Decorative Elements -->
+              <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div class="absolute -right-32 -top-32 h-64 w-64 rounded-full bg-[#e62020]/5 blur-3xl group-hover:bg-[#e62020]/10 transition-all duration-500" />
+              
               <!-- Badge -->
-              <div class="absolute right-0 top-0 rounded-bl-lg bg-[#e62020] px-4 py-1 text-sm font-semibold text-white">
+              <div class="absolute right-0 top-0 rounded-bl-xl bg-gradient-to-r from-[#e62020] to-[#ff0000] px-4 py-2 text-sm font-semibold text-white shadow-lg">
                 {item.guess_type}
               </div>
 
-              <div class="mb-6 space-y-4">
+              <!-- Content -->
+              <div class="space-y-4">
                 <div>
-                  <p class="text-sm text-gray-400">Tanggal</p>
-                  <p class="text-lg font-semibold text-white">
-                    {new Date(item.tanggal).toLocaleDateString('id-ID', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
+                  <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Tanggal</p>
+                  <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">
+                    {new Date(item.tanggal).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                 </div>
 
                 <div>
-                  <p class="text-sm text-gray-400">Hadiah</p>
-                  <p class="text-2xl font-bold text-[#e62020]">
-                    {formatCurrency(item.prize_pool)}
+                  <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Hadiah</p>
+                  <p class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#e62020] to-[#ff0000]">
+                    Rp {item.prize_pool.toLocaleString('id-ID')}
                   </p>
                 </div>
 
                 <div>
-                  <p class="text-sm text-gray-400">Maksimal Pemenang</p>
-                  <p class="text-white">{item.max_winner} orang</p>
+                  <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Maksimal Pemenang</p>
+                  <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">
+                    {item.max_winner} orang
+                  </p>
                 </div>
+
+                {#if item.result !== null}
+                  <div>
+                    <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Hasil</p>
+                    <p class="text-3xl font-bold text-green-400">{item.result}</p>
+                  </div>
+                {:else}
+                  <div class="pt-4">
+                    <input
+                      type="number"
+                      bind:value={guessNumber}
+                      placeholder="Masukkan tebakan..."
+                      class="w-full rounded-lg bg-[#1a1a1a] px-4 py-3 text-white border border-gray-800 mb-4 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent transition-all duration-300"
+                    />
+                    <button
+                      on:click={() => handleSubmit(lombaId)}
+                      disabled={submitting}
+                      class="w-full transform rounded-lg bg-gradient-to-r from-[#e62020] to-[#ff0000] py-3 font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#e62020]/20 hover:from-[#ff0000] hover:to-[#e62020] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {submitting ? 'Memproses...' : 'Kirim Tebakan'}
+                    </button>
+                  </div>
+                {/if}
               </div>
 
-              {#if item.result !== null}
-                <div class="mb-4 rounded-lg bg-green-500/10 p-4 text-center">
-                  <p class="text-sm font-medium text-gray-400">Hasil</p>
-                  <p class="text-2xl font-bold text-green-500">{item.result}</p>
-                </div>
-              {:else}
-                <button class="w-full transform rounded-lg bg-[#e62020] py-3 font-medium text-white transition-all hover:-translate-y-0.5 hover:bg-[#ff0000] hover:shadow-lg">
-                  Ikuti Lomba
-                </button>
-              {/if}
+              <!-- Tombol Ikuti Lomba -->
+              <a
+                href="/tebakan/{lombaId}"
+                class="mt-6 block w-full transform rounded-lg bg-gradient-to-r from-[#e62020] to-[#ff0000] px-4 py-3 text-center font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#e62020]/20 hover:from-[#ff0000] hover:to-[#e62020]"
+              >
+                Ikuti Lomba
+              </a>
             </div>
           {/each}
         </div>

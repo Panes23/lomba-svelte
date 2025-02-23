@@ -6,6 +6,7 @@
   import { goto } from '$app/navigation';
   import { invalidate } from '$app/navigation';
   import { user } from '$lib/stores/authStore';
+  import { page } from '$app/stores';
 
   let isScrolled = false;
   let isMobileMenuOpen = false;
@@ -35,35 +36,21 @@
 
   async function handleLogout() {
     try {
-      loading = true;
-      const { error } = await supabaseClient.auth.signOut();
-      if (error) throw error;
-      
-      user.set(null);
-      await invalidate('supabase:auth');
+      await user.signOut();
       goto('/');
-    } catch (err) {
-      console.error('Error logging out:', err.message);
-    } finally {
-      loading = false;
+    } catch (error) {
+      console.error('Error signing out:', error);
     }
   }
 
-  onMount(async () => {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) {
-      user.set(session.user);
-    }
-
-    await fetchMarkets();
-
+  onMount(() => {
+    user.initialize();
     const handleScroll = () => {
       isScrolled = window.scrollY > 20;
     };
-
     handleScroll();
-    
     window.addEventListener('scroll', handleScroll, { passive: true });
+    fetchMarkets();
     return () => window.removeEventListener('scroll', handleScroll);
   });
 

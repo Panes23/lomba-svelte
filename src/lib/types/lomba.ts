@@ -13,5 +13,5 @@ export interface Lomba {
     buka: string;
     tutup: string;
     image: string;
-  }[]
+  };
 } 
