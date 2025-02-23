@@ -7,12 +7,13 @@
   import { invalidate } from '$app/navigation';
   import { user } from '$lib/stores/authStore';
   import { page } from '$app/stores';
+  import type { Market } from '$lib/types/market';
 
   let isScrolled = false;
   let isMobileMenuOpen = false;
   let isMarketDropdownOpen = false;
-  let loading = false;
-  let markets = [];
+  let loading = true;
+  let markets: Market[] = [];
 
   const navLinks = [
     { href: '/', text: 'Beranda' },
@@ -21,6 +22,58 @@
     { href: '/faq', text: 'FAQ' },
     { href: '/contact', text: 'Kontak' }
   ];
+
+  // Fungsi untuk mendapatkan status market dengan nilai prioritas
+  function getMarketStatusPriority(market: Market): number {
+    const openTime = parseInt(market.buka.replace(':', ''));
+    const closeTime = parseInt(market.tutup.replace(':', ''));
+    const now = new Date();
+    const currentTime = now.getHours() * 100 + now.getMinutes();
+    
+    if (currentTime >= openTime && currentTime < closeTime) return 2;
+    if (currentTime < openTime) return 1;
+    return 0;
+  }
+  
+  // Fungsi untuk mendapatkan menit tersisa sampai tutup
+  function getMinutesUntilClose(market: Market): number {
+    const closeTime = market.tutup.split(':');
+    const closeHour = parseInt(closeTime[0]);
+    const closeMinute = parseInt(closeTime[1]);
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    return (closeHour * 60 + closeMinute) - (currentHour * 60 + currentMinute);
+  }
+  
+  // Fungsi untuk mendapatkan status market
+  function getMarketStatus(market: Market) {
+    const openTime = parseInt(market.buka.replace(':', ''));
+    const closeTime = parseInt(market.tutup.replace(':', ''));
+    const now = new Date();
+    const currentTime = now.getHours() * 100 + now.getMinutes();
+    
+    if (currentTime < openTime) return { text: 'BELUM DIMULAI', color: 'text-yellow-400' };
+    if (currentTime >= openTime && currentTime < closeTime) return { text: 'BUKA', color: 'text-green-400' };
+    return { text: 'TUTUP', color: 'text-red-400' };
+  }
+  
+  // Sort markets berdasarkan status dan waktu tutup
+  $: sortedMarkets = [...markets].sort((a, b) => {
+    const statusA = getMarketStatusPriority(a);
+    const statusB = getMarketStatusPriority(b);
+    
+    if (statusA !== statusB) return statusB - statusA;
+    
+    if (statusA === 2) {
+      const timeA = getMinutesUntilClose(a);
+      const timeB = getMinutesUntilClose(b);
+      return timeA - timeB;
+    }
+    
+    return 0;
+  });
 
   async function fetchMarkets() {
     try {
@@ -93,30 +146,46 @@
 
               {#if isMarketDropdownOpen}
                 <div
-                  class="absolute top-full left-0 mt-2 w-56 bg-[#222] rounded-xl shadow-xl border border-gray-800 overflow-hidden"
+                  class="absolute top-full left-0 mt-2 w-64 bg-[#222] rounded-xl shadow-xl border border-gray-800"
                   on:mouseleave={() => isMarketDropdownOpen = false}
                   transition:slide={{ duration: 200 }}
                 >
-                  {#if markets.length > 0}
-                    {#each markets as market}
-                      <a
-                        href="/lomba/{market.name}"
-                        class="flex items-center space-x-3 px-4 py-3 hover:bg-gray-800 transition-colors text-sm text-gray-300 hover:text-white"
-                        on:click={closeMenu}
-                      >
-                        <img
-                          src={market.image}
-                          alt={market.name}
-                          class="w-6 h-6 rounded-full object-cover"
-                        />
-                        <span>{market.name}</span>
-                      </a>
-                    {/each}
-                  {:else}
-                    <div class="px-4 py-3 text-sm text-gray-400">
-                      Tidak ada pasaran tersedia
-                    </div>
-                  {/if}
+                  <div class="max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar">
+                    {#if sortedMarkets.length > 0}
+                      {#each sortedMarkets as market}
+                        {@const status = getMarketStatus(market)}
+                        <a
+                          href="/lomba/{market.name}"
+                          class="flex items-center gap-3 px-4 py-3 hover:bg-[#1a1a1a] transition-colors border-b border-gray-800/50 last:border-0"
+                          on:click={closeMenu}
+                        >
+                          <img
+                            src={market.image}
+                            alt={market.name}
+                            class="w-6 h-6 rounded-full object-cover"
+                          />
+                          <div class="flex-1 min-w-0">
+                            <p class="text-sm text-gray-300 truncate">{market.name}</p>
+                            <div class="flex items-center gap-2 mt-1">
+                              <span class="text-[10px] font-medium px-1.5 py-0.5 rounded
+                                {status.text === 'BUKA' ? 'bg-green-500/10 text-green-500' : 
+                                 status.text === 'BELUM DIMULAI' ? 'bg-yellow-500/10 text-yellow-500' : 
+                                 'bg-red-500/10 text-red-500'}">
+                                {status.text}
+                              </span>
+                              <span class="text-[10px] text-gray-500">
+                                {market.buka} - {market.tutup}
+                              </span>
+                            </div>
+                          </div>
+                        </a>
+                      {/each}
+                    {:else}
+                      <div class="px-4 py-3 text-sm text-gray-400">
+                        Tidak ada pasaran tersedia
+                      </div>
+                    {/if}
+                  </div>
                 </div>
               {/if}
             </div>
@@ -230,9 +299,10 @@
               </button>
               
               {#if isMarketDropdownOpen}
-                <div class="bg-[#1a1a1a]/50 pl-8" transition:slide={{ duration: 200 }}>
-                  {#if markets.length > 0}
-                    {#each markets as market}
+                <div class="bg-[#1a1a1a]/50 pl-8 overflow-y-auto custom-scrollbar max-h-[calc(90vh-120px)]" transition:slide={{ duration: 200 }}>
+                  {#if sortedMarkets.length > 0}
+                    {#each sortedMarkets as market}
+                      {@const status = getMarketStatus(market)}
                       <a
                         href="/lomba/{market.name}"
                         class="flex items-center space-x-3 px-4 py-3 hover:bg-gray-800 transition-colors text-sm text-gray-300 hover:text-white"
@@ -243,7 +313,10 @@
                           alt={market.name}
                           class="w-6 h-6 rounded-full object-cover"
                         />
-                        <span>{market.name}</span>
+                        <div class="flex-1 min-w-0">
+                          <p class="text-sm text-gray-300 truncate">{market.name}</p>
+                          <p class="text-[10px] {status.color} font-medium">{status.text} ({market.buka} - {market.tutup})</p>
+                        </div>
                       </a>
                     {/each}
                   {:else}
@@ -323,5 +396,24 @@
   .slide-enter,
   .slide-leave-to {
     transform: translateY(-100%);
+  }
+
+  :global(.custom-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+  }
+
+  :global(.custom-scrollbar::-webkit-scrollbar) {
+    width: 6px;
+  }
+
+  :global(.custom-scrollbar::-webkit-scrollbar-track) {
+    background: transparent;
+  }
+
+  :global(.custom-scrollbar::-webkit-scrollbar-thumb) {
+    background-color: #333;
+    border-radius: 20px;
+    border: transparent;
   }
 </style> 

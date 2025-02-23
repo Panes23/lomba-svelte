@@ -72,7 +72,9 @@
   // Form data
   let selectedWebsite = '';
   let userIdWebsite = '';
-  let number = '';
+  let number1 = '';
+  let number2 = '';
+  let number3 = '';
   let submitting = false;
 
   // Filtered tebakan berdasarkan search
@@ -130,11 +132,24 @@
           filter: `lomba_id=eq.${lomba.id}`
         },
         async (payload) => {
-          // Fetch ulang data untuk mendapatkan relasi yang lengkap
-          await tebakanStore.fetchTebakan(lomba.id);
-          // Force reload page data jika di browser
-          if (browser) {
-            window.location.reload();
+          // Fetch dan update data secara realtime
+          const { data: newTebakan } = await supabaseClient
+            .from('tebakan')
+            .select(`
+              *,
+              websites (
+                id,
+                nama,
+                link_website,
+                color
+              )
+            `)
+            .eq('lomba_id', lomba.id)
+            .order('created_at', { ascending: false });
+
+          if (newTebakan) {
+            tebakanStore.set(newTebakan);
+            tebakan = newTebakan;
           }
         }
       )
@@ -154,29 +169,13 @@
   $: isDataReady = !isLoading && websites && websites.length > 0;
 
   async function handleSubmit() {
-    if (!selectedWebsite || !userIdWebsite || !number) {
+    if (!selectedWebsite || !userIdWebsite || !number1 || !number2 || !number3) {
       error = 'Semua field harus diisi';
       return;
     }
 
-    // Cek apakah kombinasi website dan userid sudah ada
-    const existingTebakan = tebakan.find(item => 
-      item.website_id === selectedWebsite && 
-      item.userid_website.toLowerCase() === userIdWebsite.toLowerCase()
-    );
-    
-    if (existingTebakan) {
-      await Swal.fire({
-        title: 'Gagal!',
-        text: 'Anda sudah memasang tebakan dengan User ID ini pada website yang sama',
-        icon: 'error',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#e62020',
-        background: '#222',
-        color: '#fff'
-      });
-      return;
-    }
+    // Gabungkan nomor dengan format yang diinginkan
+    const combinedNumber = `${number1}-${number2}-${number3}`;
 
     try {
       submitting = true;
@@ -186,7 +185,7 @@
         lomba_id: lomba.id,
         website_id: selectedWebsite,
         userid_website: userIdWebsite,
-        number: parseInt(number)
+        number: combinedNumber
       });
 
       if (result.error) {
@@ -196,18 +195,31 @@
       // Reset form
       selectedWebsite = '';
       userIdWebsite = '';
-      number = '';
+      number1 = '';
+      number2 = '';
+      number3 = '';
       showForm = false;
       
-      // Fetch data terbaru dan tunggu sampai selesai
-      await Promise.all([
-        tebakanStore.fetchTebakan(lomba.id),
-        // Tunggu sebentar untuk memastikan data tersimpan
-        new Promise(resolve => setTimeout(resolve, 100))
-      ]);
-      
-      // Force update tebakan dari store
-      tebakan = [...$tebakanStore];
+      // Fetch data terbaru langsung dari Supabase
+      const { data: newTebakan, error: fetchError } = await supabaseClient
+        .from('tebakan')
+        .select(`
+          *,
+          websites (
+            id,
+            nama,
+            link_website,
+            color
+          )
+        `)
+        .eq('lomba_id', lomba.id)
+        .order('created_at', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      // Update store dan local state
+      tebakanStore.set(newTebakan);
+      tebakan = newTebakan;
 
       await Swal.fire({
         title: 'Berhasil!',
@@ -218,25 +230,26 @@
         background: '#222',
         color: '#fff',
         allowOutsideClick: false,
-        didClose: () => {
-          // Refresh sekali lagi setelah modal ditutup
-          tebakanStore.fetchTebakan(lomba.id).then(() => {
-            tebakan = [...$tebakanStore];
-          });
+        willClose: () => {
+          if (browser) {
+            window.location.reload();
+          }
         }
       });
 
     } catch (err) {
+      console.error('Error submitting tebakan:', err);
+      error = err.message;
+      
       await Swal.fire({
-        title: 'Error!',
-        text: err.message || 'Gagal mengirim tebakan',
+        title: 'Gagal!',
+        text: error,
         icon: 'error',
         confirmButtonText: 'OK',
         confirmButtonColor: '#e62020',
         background: '#222',
         color: '#fff'
       });
-      console.error('Submit error:', err);
     } finally {
       submitting = false;
     }
@@ -323,7 +336,11 @@
           <!-- Winners Section -->
           {#if lomba.result !== null}
             {@const winners = tebakan
-              .filter(t => parseInt(t.number) === parseInt(lomba.result))
+              .filter(t => {
+                const numbers = t.number.split('-');
+                const resultStr = lomba.result.toString();
+                return numbers.some(num => num === resultStr);
+              })
               .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
               .slice(0, lomba.max_winner)
             }
@@ -338,33 +355,55 @@
               {#if winners.length > 0}
                 <div class="space-y-2 sm:space-y-3">
                   {#each winners as winner, index}
-                    <div class="flex items-center justify-between bg-[#1a1a1a] p-2 sm:p-3 rounded-lg border border-gray-800">
-                      <div class="flex items-center gap-3">
-                        <div class="flex items-center justify-center w-8 h-8 rounded-full 
-                          {index === 0 ? 'bg-[#FFD700]/10 text-[#FFD700]' : 
-                           index === 1 ? 'bg-[#C0C0C0]/10 text-[#C0C0C0]' :
-                           index === 2 ? 'bg-[#CD7F32]/10 text-[#CD7F32]' :
-                           'bg-gray-500/10 text-gray-500'}">
-                          {index + 1}
+                    <div class="bg-[#1a1a1a] p-2.5 sm:p-4 rounded-lg border border-gray-800 hover:border-[#e62020]/30 transition-all duration-300">
+                      <!-- Header: Website, ID, Time -->
+                      <div class="flex items-start justify-between mb-2.5">
+                        <div class="flex items-start gap-2.5">
+                          <!-- Ranking Badge -->
+                          <div class="flex items-center justify-center w-7 h-7 rounded-full 
+                            {index === 0 ? 'bg-[#FFD700]/10 text-[#FFD700]' : 
+                             index === 1 ? 'bg-[#C0C0C0]/10 text-[#C0C0C0]' :
+                             index === 2 ? 'bg-[#CD7F32]/10 text-[#CD7F32]' :
+                             'bg-gray-500/10 text-gray-500'} text-sm font-medium">
+                            {index + 1}
+                          </div>
+                          <!-- Website & ID -->
+                          <div>
+                            {#if isDataReady}
+                              <a 
+                                href={winner.websites.link_website} 
+                                style="color: {winner.websites?.color || '#fff'}" 
+                                class="hover:opacity-80 transition-colors duration-200 inline-flex items-center gap-1.5"
+                                target="_blank"
+                              >
+                                <span class="text-xs sm:text-sm font-semibold">{winner.websites.nama}</span>
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </a>
+                              <p class="text-[10px] text-gray-500 mt-0.5">
+                                ID: <span class="text-white font-medium">{winner.userid_website}</span>
+                              </p>
+                            {:else}
+                              <div class="h-5 w-24 bg-gray-800 animate-pulse rounded"></div>
+                            {/if}
+                          </div>
                         </div>
-                        <div>
-                          {#if isDataReady}
-                          <a 
-                            href={winner.websites.link_website} 
-                            style="color: {winner.websites?.color || '#fff'}" 
-                            class="hover:opacity-80 transition-colors duration-200"
-                            target="_blank"
-                          >
-                            <span class="text-xs sm:text-sm font-medium">{winner.websites.nama}</span>
-                          </a>
-                          {:else}
-                            <div class="h-5 w-24 bg-gray-800 animate-pulse rounded"></div>
-                          {/if}
-                          <p class="text-[10px] sm:text-xs text-gray-500">User ID: {winner.userid_website}</p>
-                        </div>
+                        <!-- Timestamp -->
+                        <p class="text-[10px] text-gray-500">{formatDate(winner.created_at)}</p>
                       </div>
-                      <div class="text-[10px] sm:text-sm text-gray-400">
-                        {formatDate(winner.created_at)}
+
+                      <!-- Numbers Display -->
+                      <div class="grid grid-cols-3 gap-1.5">
+                        {#each winner.number.split('-') as num}
+                          <div class="bg-[#1a1a1a]/50 rounded px-2 py-1.5 text-center border border-gray-800/50
+                            {num === lomba.result.toString() ? 'border-green-500/30 bg-green-500/5' : ''}">
+                            <span class="text-sm font-medium 
+                              {num === lomba.result.toString() ? 'text-green-500' : 'text-gray-400'}">
+                              {num}
+                            </span>
+                          </div>
+                        {/each}
                       </div>
                     </div>
                   {/each}
@@ -436,43 +475,49 @@
           </div>
           
           {#if filteredTebakan.length > 0}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4">
               {#each paginatedTebakan as item}
-                <div class="bg-[#1a1a1a] rounded-lg p-4 border border-gray-800 hover:border-[#e62020]/30 transition-all duration-300">
-                  <div class="flex justify-between items-start">
+                <div class="bg-gradient-to-br from-[#1a1a1a] to-[#222] rounded-lg p-3 sm:p-4 border border-gray-800 hover:border-[#e62020]/30 transition-all duration-300 shadow-lg">
+                  <!-- Website Info -->
+                  <div class="flex items-start justify-between mb-2 sm:mb-3">
                     <div>
                       {#if isDataReady}
-                        {@const websiteData = item.websites}
                         <a 
                           href={item.websites.link_website} 
                           style="color: {item.websites?.color || '#fff'}" 
-                          class="hover:opacity-80 transition-colors duration-200"
+                          class="hover:opacity-80 transition-colors duration-200 inline-flex items-center gap-2"
                           target="_blank"
                         >
-                          <span class="text-sm sm:text-base font-medium">{item.websites.nama}</span>
+                          <span class="text-sm sm:text-base font-semibold">{item.websites.nama}</span>
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
                         </a>
+                        <p class="text-[11px] text-gray-500 mt-0.5">ID: <span class="text-white font-medium">{item.userid_website}</span></p>
                       {:else}
                         <div class="h-5 w-24 bg-gray-800 animate-pulse rounded"></div>
                       {/if}
-                      <p class="text-xs sm:text-sm text-gray-500">{formatDate(item.created_at)}</p>
                     </div>
-                    <div class="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#e62020] to-[#ff0000] text-transparent bg-clip-text">{item.number}</div>
+                    <p class="text-[10px] sm:text-xs text-gray-500">{formatDate(item.created_at)}</p>
                   </div>
-                  <p class="text-xs sm:text-sm text-gray-400 mt-2">
-                    User ID: <span class="text-white">{item.userid_website}</span>
-                  </p>
+
+                  <!-- Number Display -->
+                  <div class="bg-[#1a1a1a]/50 rounded-lg p-2 sm:p-3 text-center border border-gray-800/50">
+                    <div class="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#e62020] to-[#ff0000] text-transparent bg-clip-text tracking-wider">
+                      {item.number.split('-').join(' - ')}
+                    </div>
+                  </div>
                 </div>
               {/each}
             </div>
             
             <!-- Pagination Controls -->
             {#if totalPages > 1}
-              <div class="flex justify-center items-center gap-2 mt-6">
+              <div class="flex justify-center items-center gap-1.5 sm:gap-2 mt-6 sm:mt-8">
                 <button
                   on:click={() => changePage(currentPage - 1)}
                   disabled={currentPage === 1}
-                  class="px-3 py-1 rounded-lg bg-[#1a1a1a] text-white border border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed hover:border-[#e62020]/30"
-                  aria-label="Previous page"
+                  class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm rounded-lg bg-[#1a1a1a] text-white border border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed hover:border-[#e62020]/30 transition-all duration-300"
                 >
                   &lt;
                 </button>
@@ -480,9 +525,7 @@
                 {#each Array(totalPages) as _, i}
                   <button
                     on:click={() => changePage(i + 1)}
-                    class="px-3 py-1 rounded-lg {currentPage === i + 1 ? 'bg-[#e62020] text-white' : 'bg-[#1a1a1a] text-white border border-gray-800 hover:border-[#e62020]/30'}"
-                    aria-label="Page {i + 1}"
-                    aria-current={currentPage === i + 1 ? 'page' : undefined}
+                    class="px-2 sm:px-3 py-1 text-sm sm:text-base rounded-lg {currentPage === i + 1 ? 'bg-[#e62020] text-white' : 'bg-[#1a1a1a] text-white border border-gray-800 hover:border-[#e62020]/30'}"
                   >
                     {i + 1}
                   </button>
@@ -491,8 +534,7 @@
                 <button
                   on:click={() => changePage(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  class="px-3 py-1 rounded-lg bg-[#1a1a1a] text-white border border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed hover:border-[#e62020]/30"
-                  aria-label="Next page"
+                  class="px-2 sm:px-3 py-1 text-sm sm:text-base rounded-lg bg-[#1a1a1a] text-white border border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed hover:border-[#e62020]/30"
                 >
                   &gt;
                 </button>
@@ -574,18 +616,42 @@
                   <!-- Number Input -->
                   <div>
                     <label 
-                      for="number"
                       class="block text-sm font-medium text-gray-400 mb-2"
                     >
                       Nomor Tebakan
                     </label>
-                    <input
-                      id="number"
-                      type="number"
-                      bind:value={number}
-                      placeholder="Masukkan nomor tebakan"
-                      class="w-full bg-[#1a1a1a] text-white rounded-lg border border-gray-800 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent"
-                    />
+                    <div class="grid grid-cols-3 gap-2">
+                      <div>
+                        <input
+                          type="text"
+                          bind:value={number1}
+                          maxlength="4"
+                          placeholder="1234"
+                          class="w-full bg-[#1a1a1a] text-white rounded-lg border border-gray-800 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent text-center"
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          bind:value={number2}
+                          maxlength="4"
+                          placeholder="4567"
+                          class="w-full bg-[#1a1a1a] text-white rounded-lg border border-gray-800 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent text-center"
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          bind:value={number3}
+                          maxlength="4"
+                          placeholder="8901"
+                          class="w-full bg-[#1a1a1a] text-white rounded-lg border border-gray-800 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent text-center"
+                        />
+                      </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">
+                      Format: xxxx-xxxx-xxxx (Contoh: 1234-4567-8901)
+                    </p>
                   </div>
 
                   <!-- Submit Button -->

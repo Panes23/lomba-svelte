@@ -5,10 +5,34 @@
   import { onMount } from 'svelte';
   import Skeleton from './Skeleton.svelte';
   import { goto } from '$app/navigation';
+  import type { Market } from '$lib/types/market';
   
-  let markets = [];
+  let markets: Market[] = [];
   let searchQuery = '';
-  let filteredMarkets = markets;
+  $: filteredMarkets = markets.filter(market => 
+    searchQuery 
+      ? market.name.toLowerCase().includes(searchQuery.toLowerCase())
+      : true
+  );
+
+  // Sort filtered markets berdasarkan status dan waktu tutup
+  $: sortedAndFilteredMarkets = [...filteredMarkets].sort((a, b) => {
+    const statusA = getMarketStatusPriority(a);
+    const statusB = getMarketStatusPriority(b);
+    
+    // Jika status berbeda, urutkan berdasarkan status
+    if (statusA !== statusB) return statusB - statusA;
+    
+    // Jika status sama dan BUKA, urutkan berdasarkan waktu tutup terdekat
+    if (statusA === 2) {
+      const timeA = getMinutesUntilClose(a);
+      const timeB = getMinutesUntilClose(b);
+      return timeA - timeB;
+    }
+    
+    return 0;
+  });
+
   let showTerms = false;
   let selectedMarket = null;
   let loading = true;
@@ -21,32 +45,12 @@
       if (!response.ok) throw new Error(data.error);
       
       markets = data;
-      filteredMarkets = markets;
     } catch (err) {
       console.error('Error:', err);
     } finally {
       loading = false;
     }
   });
-
-  $: {
-    if (searchQuery) {
-      filteredMarkets = markets.filter(market => 
-        market.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    } else {
-      filteredMarkets = markets;
-    }
-  }
-
-  function handleSearch(event) {
-    searchQuery = event.target.value.toLowerCase();
-    filteredMarkets = markets.filter(market => 
-      market.name.toLowerCase().includes(searchQuery) ||
-      market.buka.toLowerCase().includes(searchQuery) ||
-      market.tutup.toLowerCase().includes(searchQuery)
-    );
-  }
 
   function getMarketStatus(market) {
     const openTime = parseInt(market.buka.replace(':', ''));
@@ -79,6 +83,33 @@
       goto(`/lomba/${selectedMarket.id}`);
     }
     showTerms = false;
+  }
+
+  // Fungsi untuk mendapatkan status market dengan nilai prioritas
+  function getMarketStatusPriority(market: Market): number {
+    const openTime = parseInt(market.buka.replace(':', ''));
+    const closeTime = parseInt(market.tutup.replace(':', ''));
+    const now = new Date();
+    const currentTime = now.getHours() * 100 + now.getMinutes();
+    
+    // Status BUKA mendapat prioritas tertinggi (2)
+    if (currentTime >= openTime && currentTime < closeTime) return 2;
+    // Status BELUM DIMULAI mendapat prioritas menengah (1)
+    if (currentTime < openTime) return 1;
+    // Status TUTUP mendapat prioritas terendah (0)
+    return 0;
+  }
+  
+  // Fungsi untuk mendapatkan menit tersisa sampai tutup
+  function getMinutesUntilClose(market: Market): number {
+    const closeTime = market.tutup.split(':');
+    const closeHour = parseInt(closeTime[0]);
+    const closeMinute = parseInt(closeTime[1]);
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    return (closeHour * 60 + closeMinute) - (currentHour * 60 + currentMinute);
   }
 </script>
 
@@ -140,7 +171,7 @@
       {/each}
     {:else}
       {#if filteredMarkets.length > 0}
-        {#each filteredMarkets as market}
+        {#each sortedAndFilteredMarkets as market}
           {@const status = getMarketStatus(market)}
           <div 
             class="group relative overflow-hidden rounded-2xl border border-gray-800/50 bg-gradient-to-br from-[#1a1a1a] to-[#222] p-5 hover:border-[#e62020]/30 transition-all duration-300 shadow-xl shadow-black/20 backdrop-blur-sm hover:shadow-2xl hover:shadow-[#e62020]/5 min-h-[350px] flex flex-col"
@@ -191,7 +222,7 @@
             <!-- Official Link -->
             <div class="mb-4 text-center">
               <a
-                href={market.officiallink}
+                href={market.officialLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 class="w-full group/link inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#e62020]/10 to-[#e62020]/5 border border-[#e62020]/20 hover:border-[#e62020]/40 transition-all duration-300 backdrop-blur-sm hover:shadow-lg hover:shadow-[#e62020]/10 whitespace-nowrap text-xs"

@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { supabaseClient } from '$lib/supabaseClient';
 import type { PageServerLoad } from './$types';
+import { isUUID } from '$lib/utils/validation';
 
 export const load: PageServerLoad = async ({ params, setHeaders }) => {
   // Set headers untuk mencegah caching
@@ -17,7 +18,7 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
     const timestamp = new Date().getTime();
     
     // Validasi lombaid
-    if (!params.lombaId) {
+    if (!params.lombaId || !isUUID(params.lombaId)) {
       throw error(400, 'ID Lomba tidak valid');
     }
     
@@ -35,20 +36,21 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
         )
       `)
       .eq('id', params.lombaId)
-      .single();
+      .maybeSingle();
 
     if (lombaError) {
       console.error('Error fetching lomba:', lombaError);
-      throw error(500, 'Gagal memuat data lomba');
+      throw error(500, `Gagal memuat data lomba: ${lombaError.message}`);
     }
     
     if (!lombaData) {
+      console.error('Lomba not found:', params.lombaId);
       throw error(404, 'Lomba tidak ditemukan');
     }
     
     if (!lombaData.markets) {
       console.error('Market data missing for lomba:', lombaData);
-      throw error(500, 'Data market tidak ditemukan');
+      throw error(404, `Data market untuk lomba ${params.lombaId} tidak ditemukan`);
     }
 
     // Ambil daftar website
@@ -59,7 +61,7 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 
     if (websitesError) {
       console.error('Error fetching websites:', websitesError);
-      throw websitesError;
+      throw error(500, 'Gagal memuat data website');
     }
 
     // Ambil daftar tebakan untuk lomba ini
@@ -80,7 +82,7 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 
     if (tebakanError) {
       console.error('Error fetching tebakan:', tebakanError);
-      throw tebakanError;
+      throw error(500, 'Gagal memuat data tebakan');
     }
 
     return {
@@ -91,9 +93,9 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
     };
   } catch (err) {
     console.error('Error loading tebakan data:', err);
-    if (err instanceof Error) {
-      throw error(500, err.message);
+    if (err instanceof error) {
+      throw err;
     }
-    throw error(500, 'Gagal memuat data');
+    throw error(500, err instanceof Error ? err.message : 'Gagal memuat data');
   }
 }; 

@@ -171,8 +171,8 @@
             />
           </div>
           
-          <h1 class="mb-6 text-center text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
-            Lomba {market.name}
+          <h1 class="mb-6 text-center text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
+            {market.name}
           </h1>
 
           <!-- Market Status -->
