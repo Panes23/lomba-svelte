@@ -2,6 +2,7 @@
 	import '../app.css';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
+	import ReloadPrompt from '$lib/components/ReloadPrompt.svelte';
 	import { onMount } from 'svelte';
 	import { supabaseClient } from '$lib/supabaseClient';
 	import { user } from '$lib/stores/authStore';
@@ -36,6 +37,8 @@
 </main>
 
 <Footer />
+
+<ReloadPrompt />
 
 <style>
 	:global(body) {
