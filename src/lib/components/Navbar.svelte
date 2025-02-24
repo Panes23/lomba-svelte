@@ -121,19 +121,19 @@
     return () => window.removeEventListener('scroll', handleScroll);
   });
 
-  onMount(async () => {
-    if ($user?.email) {
-      const { data, error } = await supabaseClient
-        .from('users')
-        .select('username')
-        .eq('email', $user.email)
-        .single();
-      
-      if (data) {
-        username = data.username;
-      }
-    }
-  });
+  // Reactive statement untuk update username ketika user berubah
+  $: if ($user?.email) {
+    supabaseClient
+      .from('users')
+      .select('username')
+      .eq('email', $user.email)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          username = data.username;
+        }
+      });
+  }
 
   function closeMenu() {
     isMobileMenuOpen = false;
