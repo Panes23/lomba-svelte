@@ -7,9 +7,13 @@
 	import { supabaseClient } from '$lib/supabaseClient';
 	import { user } from '$lib/stores/authStore';
 	import { invalidate } from '$app/navigation';
+	import { page } from '$app/stores';
 
 	export let data;
 	$: ({ supabase, session } = data);
+
+	// Cek apakah route saat ini adalah /cups/*
+	$: isAdminRoute = $page.url.pathname.startsWith('/cups') || $page.route.id?.includes('(admin)');
 
 	onMount(() => {
 		user.initialize();
@@ -30,13 +34,17 @@
 	});
 </script>
 
-<Navbar />
+{#if !isAdminRoute}
+	<Navbar />
+{/if}
 
 <main>
 	<slot />
 </main>
 
-<Footer />
+{#if !isAdminRoute}
+	<Footer />
+{/if}
 
 <ReloadPrompt />
 

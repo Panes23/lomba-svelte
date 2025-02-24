@@ -142,15 +142,15 @@
 
   // Format tanggal
   function formatDate(dateString) {
-    return new Date(dateString).toLocaleString('id-ID', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
+    const date = new Date(dateString);
+    const day = date.getDate();
+    const month = date.toLocaleString('id-ID', { month: 'long' });
+    const year = date.getFullYear();
+    const hour = String(date.getHours()).padStart(2, '0');
+    const minute = String(date.getMinutes()).padStart(2, '0');
+    const second = String(date.getSeconds()).padStart(2, '0');
+    
+    return `${day} ${month} ${year} pukul ${hour}:${minute}:${second}`;
   }
 
   let subscription;
