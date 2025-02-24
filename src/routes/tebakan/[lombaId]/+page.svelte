@@ -8,6 +8,9 @@
   import { tebakanStore } from '$lib/stores/tebakanStore';
   import { browser } from '$app/environment';
   import type { Market } from '$lib/types/market';
+  import { enhance } from '$app/forms';
+  import type { PageData } from './$types';
+  import { writable } from 'svelte/store';
   
   // Definisikan tipe untuk website
   interface Website {
@@ -57,8 +60,48 @@
     return { text: 'TUTUP', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/20' };
   }
 
-  export let data;
-  $: ({ lomba, websites, tebakan: initialTebakan, timestamp } = data);
+  // Fungsi untuk mengecek apakah tebakan menang
+  function isWinningGuess(guess: string, result: string, guessType: string): boolean {
+    // Hapus tanda - dari tebakan
+    const cleanGuess = guess.replace(/-/g, '');
+    
+    switch(guessType.toLowerCase()) {
+      case '4d':
+        return cleanGuess === result;
+      case '3d':
+        // Ambil 3 digit terakhir
+        return cleanGuess === result.slice(-3);
+      case '2d':
+        // Ambil 2 digit terakhir
+        return cleanGuess === result.slice(-2);
+      default:
+        return false;
+    }
+  }
+
+  // Buat store untuk lomba dan websites
+  const lombaStore = writable(null);
+  const websitesStore = writable([]);
+  const tebakanInitialStore = writable([]);
+  
+  export let data: PageData;
+  $: {
+    // Update store saat data berubah
+    const { lomba: initialLomba, websites: initialWebsites, tebakan: initialTebakan } = data;
+    if (initialLomba) {
+      lombaStore.set(initialLomba);
+    }
+    if (initialWebsites) {
+      websitesStore.set(initialWebsites);
+    }
+    if (initialTebakan) {
+      tebakanInitialStore.set(initialTebakan);
+    }
+  }
+  
+  // Subscribe ke store
+  $: lomba = $lombaStore;
+  $: websites = $websitesStore;
   $: tebakan = $tebakanStore;
   let error = null;
   
@@ -104,7 +147,9 @@
       month: 'long',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
     });
   }
 
@@ -112,17 +157,14 @@
   
   onMount(() => {
     if (browser) {
-      // Set initial data dari server
-      tebakanStore.set(initialTebakan);
+      tebakanStore.set($tebakanInitialStore);
       isLoading = false;
     }
     
-    // Pastikan lomba.id valid sebelum subscribe
     if (!lomba?.id) return;
     
-    // Subscribe ke perubahan tebakan
     subscription = supabaseClient
-      .channel('tebakan-changes')
+      .channel('realtime-changes')
       .on(
         'postgres_changes',
         {
@@ -132,7 +174,6 @@
           filter: `lomba_id=eq.${lomba.id}`
         },
         async (payload) => {
-          // Fetch dan update data secara realtime
           const { data: newTebakan } = await supabaseClient
             .from('tebakan')
             .select(`
@@ -153,6 +194,35 @@
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lomba',
+          filter: `id=eq.${lomba.id}`
+        },
+        async (payload) => {
+          const { data: updatedLomba } = await supabaseClient
+            .from('lomba')
+            .select(`
+              *,
+              markets (
+                id,
+                name,
+                buka,
+                tutup,
+                image
+              )
+            `)
+            .eq('id', lomba.id)
+            .single();
+          
+          if (updatedLomba) {
+            lombaStore.set(updatedLomba);
+          }
+        }
+      )
       .subscribe();
 
     return () => {
@@ -168,9 +238,60 @@
   // Reactive statement untuk memastikan data tersedia
   $: isDataReady = !isLoading && websites && websites.length > 0;
 
+  // Fungsi untuk mendapatkan max length berdasarkan guess_type
+  function getMaxLength(guessType: string): number {
+    switch(guessType.toLowerCase()) {
+      case '4d': return 4;
+      case '3d': return 3;
+      case '2d': return 2;
+      default: return 4;
+    }
+  }
+
+  // Fungsi untuk memvalidasi input hanya angka dan sesuai max length
+  function validateNumberInput(event: Event, maxLength: number) {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    
+    // Hanya izinkan angka
+    if (!/^\d*$/.test(value)) {
+      input.value = value.replace(/[^\d]/g, '');
+    }
+    
+    // Batasi panjang input
+    if (value.length > maxLength) {
+      input.value = value.slice(0, maxLength);
+    }
+  }
+
   async function handleSubmit() {
     if (!selectedWebsite || !userIdWebsite || !number1 || !number2 || !number3) {
       error = 'Semua field harus diisi';
+      return;
+    }
+
+    // Cek apakah user sudah pernah memasang tebakan dengan website dan userid yang sama
+    const existingTebakan = tebakan.find(t => 
+      t.website_id === selectedWebsite && 
+      t.userid_website.toLowerCase() === userIdWebsite.toLowerCase()
+    );
+    
+    if (existingTebakan) {
+      await Swal.fire({
+        title: 'Gagal!',
+        text: 'Anda sudah melakukan tebakan di website ini dengan User ID yang sama',
+        icon: 'error',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#e62020',
+        background: '#222',
+        color: '#fff',
+        allowOutsideClick: false,
+        didClose: () => {
+          // Reset form fields
+          selectedWebsite = '';
+          userIdWebsite = '';
+        }
+      });
       return;
     }
 
@@ -254,6 +375,20 @@
       submitting = false;
     }
   }
+
+  // Reactive statement untuk mendapatkan pemenang
+  $: winners = lomba?.result ? tebakan
+    .filter(t => {
+      // Split nomor tebakan menjadi array
+      const guesses = t.number.split('-');
+      // Cek setiap line tebakan
+      return guesses.some(guess => isWinningGuess(guess, lomba.result, lomba.guess_type));
+    })
+    // Urutkan berdasarkan waktu posting (ascending)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    // Batasi jumlah pemenang sesuai max_winner
+    .slice(0, lomba.max_winner)
+    : [];
 </script>
 
 <div class="min-h-screen bg-[#1a1a1a] pt-24 pb-12">
@@ -335,15 +470,6 @@
 
           <!-- Winners Section -->
           {#if lomba.result !== null}
-            {@const winners = tebakan
-              .filter(t => {
-                const numbers = t.number.split('-');
-                const resultStr = lomba.result.toString();
-                return numbers.some(num => num === resultStr);
-              })
-              .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-              .slice(0, lomba.max_winner)
-            }
             <div class="mt-4 sm:mt-6 bg-gradient-to-br from-[#1a1a1a] to-[#222] p-3 sm:p-6 rounded-lg sm:rounded-xl border border-gray-800 shadow-lg">
               <div class="flex justify-between items-center mb-4">
                 <p class="text-xs sm:text-sm text-gray-400">Pemenang</p>
@@ -355,51 +481,39 @@
               {#if winners.length > 0}
                 <div class="space-y-2 sm:space-y-3">
                   {#each winners as winner, index}
-                    <div class="bg-[#1a1a1a] p-2.5 sm:p-4 rounded-lg border border-gray-800 hover:border-[#e62020]/30 transition-all duration-300">
-                      <!-- Header: Website, ID, Time -->
-                      <div class="flex items-start justify-between mb-2.5">
-                        <div class="flex items-start gap-2.5">
-                          <!-- Ranking Badge -->
-                          <div class="flex items-center justify-center w-7 h-7 rounded-full 
-                            {index === 0 ? 'bg-[#FFD700]/10 text-[#FFD700]' : 
-                             index === 1 ? 'bg-[#C0C0C0]/10 text-[#C0C0C0]' :
-                             index === 2 ? 'bg-[#CD7F32]/10 text-[#CD7F32]' :
-                             'bg-gray-500/10 text-gray-500'} text-sm font-medium">
-                            {index + 1}
-                          </div>
-                          <!-- Website & ID -->
-                          <div>
-                            {#if isDataReady}
-                              <a 
-                                href={winner.websites.link_website} 
-                                style="color: {winner.websites?.color || '#fff'}" 
-                                class="hover:opacity-80 transition-colors duration-200 inline-flex items-center gap-1.5"
-                                target="_blank"
-                              >
-                                <span class="text-xs sm:text-sm font-semibold">{winner.websites.nama}</span>
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                              </a>
-                              <p class="text-[10px] text-gray-500 mt-0.5">
-                                ID: <span class="text-white font-medium">{winner.userid_website}</span>
-                              </p>
-                            {:else}
-                              <div class="h-5 w-24 bg-gray-800 animate-pulse rounded"></div>
-                            {/if}
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-[#1a1a1a] rounded-lg border border-gray-800/50 hover:bg-[#1a1a1a]/80 transition-colors gap-3 sm:gap-0">
+                      <!-- Kiri: Ranking & User Info -->
+                      <div class="flex items-center gap-3">
+                        <div class="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#222] border border-gray-800 flex items-center justify-center">
+                          <span class="text-[#FFD700] text-xs sm:text-sm font-bold">#{index + 1}</span>
+                        </div>
+                        <div>
+                          <p class="text-white text-sm sm:text-base font-medium">{winner.userid_website}</p>
+                          <div class="flex items-center gap-2">
+                            <a 
+                              href={winner.websites.link_website} 
+                              target="_blank" 
+                              style="color: {winner.websites.color}"
+                              class="text-xs sm:text-sm hover:opacity-80 transition-colors inline-flex items-center gap-2"
+                            >
+                              {winner.websites.nama}
+                              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </a>
+                            <span class="text-xs text-gray-500">•</span>
+                            <span class="text-[10px] sm:text-xs text-gray-500">{formatDate(winner.created_at)}</span>
                           </div>
                         </div>
-                        <!-- Timestamp -->
-                        <p class="text-[10px] text-gray-500">{formatDate(winner.created_at)}</p>
                       </div>
 
-                      <!-- Numbers Display -->
-                      <div class="grid grid-cols-3 gap-1.5">
+                      <!-- Kanan: Nomor Tebakan -->
+                      <div class="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2 sm:mt-0">
                         {#each winner.number.split('-') as num}
-                          <div class="bg-[#1a1a1a]/50 rounded px-2 py-1.5 text-center border border-gray-800/50
-                            {num === lomba.result.toString() ? 'border-green-500/30 bg-green-500/5' : ''}">
-                            <span class="text-sm font-medium 
-                              {num === lomba.result.toString() ? 'text-green-500' : 'text-gray-400'}">
+                          <div class="bg-[#222] rounded px-2 sm:px-3 py-1 sm:py-1.5 text-center border border-gray-800/50
+                            {num === lomba.result.slice(-lomba.guess_type.slice(0,1)) ? 'border-green-500/30 bg-green-500/5' : ''}">
+                            <span class="text-xs sm:text-sm font-medium 
+                              {num === lomba.result.slice(-lomba.guess_type.slice(0,1)) ? 'text-green-500' : 'text-gray-400'}">
                               {num}
                             </span>
                           </div>
@@ -409,7 +523,10 @@
                   {/each}
                 </div>
               {:else}
-                <p class="text-center text-gray-400 py-4">Tidak ada pemenang</p>
+                <div class="text-center py-8">
+                  <p class="text-gray-400">Belum ada pemenang</p>
+                  <p class="text-sm text-gray-500 mt-1">Tetap semangat untuk mencoba lagi!</p>
+                </div>
               {/if}
             </div>
           {/if}
@@ -625,8 +742,9 @@
                         <input
                           type="text"
                           bind:value={number1}
-                          maxlength="4"
-                          placeholder="1234"
+                          maxlength={getMaxLength(lomba.guess_type)}
+                          on:input={(e) => validateNumberInput(e, getMaxLength(lomba.guess_type))}
+                          placeholder={lomba.guess_type}
                           class="w-full bg-[#1a1a1a] text-white rounded-lg border border-gray-800 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent text-center"
                         />
                       </div>
@@ -634,8 +752,9 @@
                         <input
                           type="text"
                           bind:value={number2}
-                          maxlength="4"
-                          placeholder="4567"
+                          maxlength={getMaxLength(lomba.guess_type)}
+                          on:input={(e) => validateNumberInput(e, getMaxLength(lomba.guess_type))}
+                          placeholder={lomba.guess_type}
                           class="w-full bg-[#1a1a1a] text-white rounded-lg border border-gray-800 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent text-center"
                         />
                       </div>
@@ -643,14 +762,15 @@
                         <input
                           type="text"
                           bind:value={number3}
-                          maxlength="4"
-                          placeholder="8901"
+                          maxlength={getMaxLength(lomba.guess_type)}
+                          on:input={(e) => validateNumberInput(e, getMaxLength(lomba.guess_type))}
+                          placeholder={lomba.guess_type}
                           class="w-full bg-[#1a1a1a] text-white rounded-lg border border-gray-800 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent text-center"
                         />
                       </div>
                     </div>
                     <p class="text-xs text-gray-500 mt-2">
-                      Format: xxxx-xxxx-xxxx (Contoh: 1234-4567-8901)
+                      Format: {lomba.guess_type} (Contoh: {lomba.guess_type === '4D' ? '1234' : lomba.guess_type === '3D' ? '123' : '12'})
                     </p>
                   </div>
 

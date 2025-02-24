@@ -6,9 +6,13 @@
   import type { Market } from '$lib/types/market';
   import type { Lomba } from '$lib/types/lomba';
   import { MetaTags } from 'svelte-meta-tags';
+  import { formatDateForInput } from '$lib/utils/date';
 
   export let data;
-  $: ({ market, lomba, selectedDate } = data);
+  // State untuk filter tanggal
+  let selectedDate = formatDateForInput(new Date());
+  
+  $: ({ market, lomba } = data);
 
   // Gunakan $page.params.market untuk URL
   $: marketName = $page.params.market;
@@ -16,6 +20,15 @@
   let error = null;
   let guessNumber = '';
   let submitting = false;
+
+  // Filter lomba berdasarkan tanggal
+  $: filteredLomba = lomba.filter(item => {
+    if (!selectedDate) return true;
+    return item.tanggal === selectedDate;
+  });
+
+  // Reactive statement untuk status
+  $: status = market ? getMarketStatus(market) : null;
 
   function getMarketStatus(market: Market) {
     const openTime = parseInt(market.buka.replace(':', ''));
@@ -177,7 +190,6 @@
 
           <!-- Market Status -->
           {#if market}
-            {@const status = getMarketStatus(market)}
             <div class="mb-6 md:mb-8 flex justify-center">
               <div class="flex items-center gap-2 rounded-lg {status.bg} {status.border} border px-4 py-2">
                 <span class="h-2 w-2 rounded-full animate-pulse" class:bg-yellow-400={status.text === 'BELUM DIMULAI'} class:bg-green-400={status.text === 'BUKA'} class:bg-red-400={status.text === 'TUTUP'}></span>
@@ -216,9 +228,9 @@
       </div>
 
       <!-- Lomba Cards -->
-      {#if lomba.length > 0}
+      {#if filteredLomba.length > 0}
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 container mx-auto px-4">
-          {#each lomba as item}
+          {#each filteredLomba as item}
             {@const lombaId = item.id}
             <div class="group relative overflow-hidden rounded-xl border border-gray-800/50 bg-gradient-to-br from-[#1a1a1a] to-[#222] p-6 hover:border-[#e62020]/30 transition-all duration-300 shadow-xl shadow-black/20 backdrop-blur-sm">
               <!-- Decorative Elements -->

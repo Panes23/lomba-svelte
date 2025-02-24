@@ -4,6 +4,7 @@
   import { goto } from '$app/navigation';
   import { invalidate } from '$app/navigation';
   import { user } from '$lib/stores/authStore';
+  import Swal from '$lib/utils/swal';
 
   let identifier = '';
   let password = '';
@@ -11,17 +12,47 @@
   let error = null;
 
   async function handleLogin() {
+    loading = true;
     try {
-      loading = true;
-      
+      // Coba login
       const { error } = await user.signIn(identifier, password);
 
-      if (error) throw error;
+      if (error) {
+        // Cek apakah user ada
+        const { data: userData } = await supabaseClient
+          .from('users')
+          .select('email')
+          .or(`email.eq.${identifier},username.eq.${identifier}`)
+          .single();
+        
+        if (!userData) {
+          await Swal.fire({
+            title: 'Opps!',
+            text: 'Username atau email belum terdaftar',
+            icon: 'error',
+            confirmButtonColor: '#e62020'
+          });
+        } else {
+          await Swal.fire({
+            title: 'Opps!',
+            text: 'Password yang anda masukkan salah',
+            icon: 'error',
+            confirmButtonColor: '#e62020'
+          });
+        }
+        loading = false;
+        return;
+      }
+
       goto('/');
     } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message);
-      }
+      console.error('Error:', error);
+      await Swal.fire({
+        title: 'Opps!',
+        text: 'Pastikan kembali email/username dan password anda',
+        icon: 'error',
+        confirmButtonColor: '#e62020'
+      });
     } finally {
       loading = false;
     }

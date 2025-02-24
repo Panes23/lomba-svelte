@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { supabaseClient } from '$lib/supabaseClient';
-import type { PageServerLoad } from './$types';
+import type { PageServerLoad, Actions } from './$types';
 import { isUUID } from '$lib/utils/validation';
 
 export const load: PageServerLoad = async ({ params, setHeaders }) => {
@@ -97,5 +97,50 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
       throw err;
     }
     throw error(500, err instanceof Error ? err.message : 'Gagal memuat data');
+  }
+};
+
+export const actions: Actions = {
+  default: async ({ request, params }) => {
+    const formData = await request.formData();
+    const website_id = formData.get('website_id');
+    const userid_website = formData.get('userid_website');
+    const number = formData.get('number');
+    const lomba_id = params.lombaId;
+
+    try {
+      // Cek apakah kombinasi website_id dan userid_website sudah ada untuk lomba ini
+      const { data: existingTebakan, error: checkError } = await supabaseClient
+        .from('tebakan')
+        .select('id')
+        .eq('lomba_id', lomba_id)
+        .eq('website_id', website_id)
+        .eq('userid_website', userid_website)
+        .single();
+      
+      if (existingTebakan) {
+        throw new Error('User ID ini sudah melakukan tebakan di website yang sama untuk lomba ini');
+      }
+
+      // Lanjutkan dengan insert data jika validasi berhasil
+      const { data, error: insertError } = await supabaseClient
+        .from('tebakan')
+        .insert([
+          {
+            lomba_id,
+            website_id,
+            userid_website,
+            number
+          }
+        ])
+        .select()
+        .single();
+
+      if (insertError) throw new Error(insertError.message);
+
+      return { success: true, data };
+    } catch (err) {
+      throw error(400, err.message);
+    }
   }
 }; 

@@ -48,10 +48,23 @@
     <Slider />
   </div>
 
-  <!-- Market Cards -->
-  <div class="py-8">
-    <MarketCard />
-  </div>
+  <!-- Market Section -->
+  <section class="py-12">
+    <div class="container">
+      <div class="max-w-7xl mx-auto">
+        <div class="text-center mb-8">
+          <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">
+            Pasaran Tersedia
+          </h2>
+          <p class="text-gray-400 max-w-2xl mx-auto">
+            Pilih pasaran favorit Anda dari berbagai pilihan yang tersedia. Setiap pasaran menawarkan hadiah menarik untuk para pemenang.
+          </p>
+        </div>
+
+        <MarketCard limit={8} />
+      </div>
+    </div>
+  </section>
 </div>
 
 <!-- Article Section -->

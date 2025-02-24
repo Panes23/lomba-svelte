@@ -9,6 +9,8 @@
   
   let markets: Market[] = [];
   let searchQuery = '';
+  export let limit: number | null = null;
+  
   $: filteredMarkets = markets.filter(market => 
     searchQuery 
       ? market.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -32,6 +34,11 @@
     
     return 0;
   });
+
+  // Sort filtered markets dan terapkan limit jika ada
+  $: displayedMarkets = limit 
+    ? sortedAndFilteredMarkets.slice(0, limit)
+    : sortedAndFilteredMarkets;
 
   let showTerms = false;
   let selectedMarket = null;
@@ -113,30 +120,26 @@
   }
 </script>
 
-<div class="mx-auto">
-  <!-- Search Bar -->
-  <div class="mb-8">
-    <div class="relative max-w-xl mx-auto">
-      <input 
-        type="text" 
-        bind:value={searchQuery}
-        placeholder="Cari pasaran..." 
-        class="w-full bg-[#1a1a1a] text-white px-6 py-4 rounded-xl border border-gray-800 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent transition-all duration-300 placeholder:text-gray-500"
-      >
-      <svg 
-        class="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" 
-        fill="none" 
-        stroke="currentColor" 
-        viewBox="0 0 24 24"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
+<div class="space-y-6">
+  <!-- Search bar jika tidak ada limit -->
+  {#if !limit}
+    <div class="max-w-xl mx-auto px-4">
+      <div class="relative">
+        <input
+          type="text"
+          bind:value={searchQuery}
+          placeholder="Cari pasaran..."
+          class="w-full bg-[#1a1a1a] text-white px-4 py-3 pr-10 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
+        />
+        <svg class="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
     </div>
-  </div>
+  {/if}
 
-  <!-- Market Grid -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-    {#if loading}
+  {#if loading}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
       {#each Array(6) as _, i}
         <div class="bg-gradient-to-br from-[#1a1a1a] to-[#222] rounded-2xl border border-gray-800/50 overflow-hidden shadow-xl shadow-black/20 backdrop-blur-sm">
           <!-- Skeleton Image -->
@@ -169,109 +172,130 @@
           </div>
         </div>
       {/each}
-    {:else}
-      {#if filteredMarkets.length > 0}
-        {#each sortedAndFilteredMarkets as market}
-          {@const status = getMarketStatus(market)}
-          <div 
-            class="group relative overflow-hidden rounded-2xl border border-gray-800/50 bg-gradient-to-br from-[#1a1a1a] to-[#222] p-5 hover:border-[#e62020]/30 transition-all duration-300 shadow-xl shadow-black/20 backdrop-blur-sm hover:shadow-2xl hover:shadow-[#e62020]/5 min-h-[350px] flex flex-col"
-            in:scale={{ duration: 300, delay: 200 }}
-          >
-            <!-- Decorative Elements -->
-            <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div class="absolute -right-32 -top-32 h-64 w-64 rounded-full bg-[#e62020]/5 blur-3xl group-hover:bg-[#e62020]/10 transition-all duration-500" />
-            <div class="absolute -left-32 -bottom-32 h-64 w-64 rounded-full bg-[#e62020]/5 blur-3xl group-hover:bg-[#e62020]/10 transition-all duration-500" />
-            
-            <!-- Market Image -->
-            <div class="relative mb-4 flex items-center justify-center h-24 w-24 mx-auto transform group-hover:scale-105 transition-all duration-500">
-              <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/20 to-transparent rounded-full blur-xl group-hover:blur-2xl transition-all duration-500" />
-              <div class="absolute inset-0 border-2 border-[#e62020]/20 rounded-full group-hover:border-[#e62020]/40 transition-all duration-500" />
-              <img
-                src={market.image}
-                alt={market.name}
-                class="relative h-20 w-20 rounded-full object-cover shadow-2xl transition-all duration-300"
-              />
-            </div>
+    </div>
+  {:else}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+      {#each displayedMarkets as market}
+        {@const status = getMarketStatus(market)}
+        <div 
+          class="group relative overflow-hidden rounded-2xl border border-gray-800/50 bg-gradient-to-br from-[#1a1a1a] to-[#222] p-5 hover:border-[#e62020]/30 transition-all duration-300 shadow-xl shadow-black/20 backdrop-blur-sm hover:shadow-2xl hover:shadow-[#e62020]/5 min-h-[350px] flex flex-col"
+          in:scale={{ duration: 300, delay: 200 }}
+        >
+          <!-- Decorative Elements -->
+          <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div class="absolute -right-32 -top-32 h-64 w-64 rounded-full bg-[#e62020]/5 blur-3xl group-hover:bg-[#e62020]/10 transition-all duration-500" />
+          <div class="absolute -left-32 -bottom-32 h-64 w-64 rounded-full bg-[#e62020]/5 blur-3xl group-hover:bg-[#e62020]/10 transition-all duration-500" />
+          
+          <!-- Market Image -->
+          <div class="relative mb-4 flex items-center justify-center h-24 w-24 mx-auto transform group-hover:scale-105 transition-all duration-500">
+            <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/20 to-transparent rounded-full blur-xl group-hover:blur-2xl transition-all duration-500" />
+            <div class="absolute inset-0 border-2 border-[#e62020]/20 rounded-full group-hover:border-[#e62020]/40 transition-all duration-500" />
+            <img
+              src={market.image}
+              alt={market.name}
+              class="relative h-20 w-20 rounded-full object-cover shadow-2xl transition-all duration-300"
+            />
+          </div>
 
-            <!-- Market Name -->
-            <h3 class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300 text-center mb-3 whitespace-nowrap overflow-hidden text-ellipsis px-2">
-              {market.name}
-            </h3>
+          <!-- Market Name -->
+          <h3 class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300 text-center mb-3 whitespace-nowrap overflow-hidden text-ellipsis px-2">
+            {market.name}
+          </h3>
 
-            <!-- Market Status -->
-            <div class="flex justify-center mb-4">
-              <div class="flex items-center gap-2 rounded-xl {status.bg} {status.border} border px-4 py-2 backdrop-blur-sm">
-                <span class="h-2 w-2 rounded-full animate-pulse" class:bg-yellow-400={status.text === 'BELUM DIMULAI'} class:bg-green-400={status.text === 'BUKA'} class:bg-red-400={status.text === 'TUTUP'} />
-                <span class="{status.color} font-semibold tracking-wide text-sm whitespace-nowrap">{status.text}</span>
-              </div>
-            </div>
-
-            <!-- Market Schedule -->
-            <div class="grid grid-cols-2 gap-3 text-center mb-4 relative">
-              <div class="absolute top-1/2 left-1/2 w-px h-12 bg-gradient-to-b from-transparent via-gray-700/50 to-transparent transform -translate-x-1/2 -translate-y-1/2" />
-              <div>
-                <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Jam Buka</p>
-                <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.buka}</p>
-              </div>
-              <div>
-                <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Jam Tutup</p>
-                <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.tutup}</p>
-              </div>
-            </div>
-
-            <!-- Official Link -->
-            <div class="mb-4 text-center">
-              <a
-                href={market.officialLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="w-full group/link inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#e62020]/10 to-[#e62020]/5 border border-[#e62020]/20 hover:border-[#e62020]/40 transition-all duration-300 backdrop-blur-sm hover:shadow-lg hover:shadow-[#e62020]/10 whitespace-nowrap text-xs"
-              >
-                <svg 
-                  class="w-4 h-4 text-[#e62020] group-hover/link:animate-bounce" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path 
-                    stroke-linecap="round" 
-                    stroke-linejoin="round" 
-                    stroke-width="2" 
-                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" 
-                  />
-                </svg>
-                <span class="text-sm font-medium text-[#e62020] group-hover/link:text-[#ff0000] transition-colors">
-                  Link Resmi
-                </span>
-              </a>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="flex gap-3 mt-auto">
-              <button
-                on:click={() => goto(`/lomba/${market.name}`)}
-                class="flex-1 transform rounded-lg bg-gradient-to-r from-[#e62020] to-[#ff0000] py-2.5 font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#e62020]/20 hover:from-[#ff0000] hover:to-[#e62020] whitespace-nowrap"
-              >
-                Ikuti Lomba
-              </button>
-              <button
-                on:click={() => handleShowTerms(market)}
-                class="p-2.5 rounded-lg border border-[#e62020]/30 text-gray-400 hover:text-white hover:border-[#e62020]/30 hover:bg-[#e62020]/10 backdrop-blur-sm"
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
+          <!-- Market Status -->
+          <div class="flex justify-center mb-4">
+            <div class="flex items-center gap-2 rounded-xl {status.bg} {status.border} border px-4 py-2 backdrop-blur-sm">
+              <span class="h-2 w-2 rounded-full animate-pulse" class:bg-yellow-400={status.text === 'BELUM DIMULAI'} class:bg-green-400={status.text === 'BUKA'} class:bg-red-400={status.text === 'TUTUP'} />
+              <span class="{status.color} font-semibold tracking-wide text-sm whitespace-nowrap">{status.text}</span>
             </div>
           </div>
-        {/each}
-      {:else}
-        <div class="col-span-full text-center py-8">
-          <p class="text-gray-400 text-lg">Tidak ada pasaran yang sesuai dengan pencarian "{searchQuery}"</p>
+
+          <!-- Market Schedule -->
+          <div class="grid grid-cols-2 gap-3 text-center mb-4 relative">
+            <div class="absolute top-1/2 left-1/2 w-px h-12 bg-gradient-to-b from-transparent via-gray-700/50 to-transparent transform -translate-x-1/2 -translate-y-1/2" />
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Jam Buka</p>
+              <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.buka}</p>
+            </div>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Jam Tutup</p>
+              <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.tutup}</p>
+            </div>
+          </div>
+
+          <!-- Official Link -->
+          <div class="mb-4 text-center">
+            <a
+              href={market.officialLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="w-full group/link inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#e62020]/10 to-[#e62020]/5 border border-[#e62020]/20 hover:border-[#e62020]/40 transition-all duration-300 backdrop-blur-sm hover:shadow-lg hover:shadow-[#e62020]/10 whitespace-nowrap text-xs"
+            >
+              <svg 
+                class="w-4 h-4 text-[#e62020] group-hover/link:animate-bounce" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path 
+                  stroke-linecap="round" 
+                  stroke-linejoin="round" 
+                  stroke-width="2" 
+                  d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" 
+                />
+              </svg>
+              <span class="text-sm font-medium text-[#e62020] group-hover/link:text-[#ff0000] transition-colors">
+                Link Resmi
+              </span>
+            </a>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex gap-3 mt-auto">
+            <button
+              on:click={() => goto(`/lomba/${market.name}`)}
+              class="flex-1 transform rounded-lg bg-gradient-to-r from-[#e62020] to-[#ff0000] py-2.5 font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#e62020]/20 hover:from-[#ff0000] hover:to-[#e62020] whitespace-nowrap"
+            >
+              Ikuti Lomba
+            </button>
+            <button
+              on:click={() => handleShowTerms(market)}
+              class="p-2.5 rounded-lg border border-[#e62020]/30 text-gray-400 hover:text-white hover:border-[#e62020]/30 hover:bg-[#e62020]/10 backdrop-blur-sm"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+          </div>
         </div>
-      {/if}
+      {/each}
+    </div>
+
+    <!-- Tombol Seluruh Pasaran jika ada limit -->
+    {#if limit && sortedAndFilteredMarkets.length > limit}
+      <div class="text-center mt-8">
+        <a 
+          href="/lomba"
+          class="inline-flex items-center gap-2 px-6 py-3 bg-[#222] hover:bg-[#333] text-white rounded-lg transition-colors duration-300 group"
+        >
+          <span>Lihat Seluruh Pasaran</span>
+          <svg 
+            class="w-4 h-4 transform transition-transform group-hover:translate-x-1" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              stroke-linecap="round" 
+              stroke-linejoin="round" 
+              stroke-width="2" 
+              d="M13 7l5 5m0 0l-5 5m5-5H6"
+            />
+          </svg>
+        </a>
+      </div>
     {/if}
-  </div>
+  {/if}
 </div>
 
 <style>

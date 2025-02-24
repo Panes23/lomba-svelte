@@ -2,24 +2,24 @@
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import Logo from './Logo.svelte';
-  import { supabaseClient } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
-  import { invalidate } from '$app/navigation';
   import { user } from '$lib/stores/authStore';
-  import { page } from '$app/stores';
   import type { Market } from '$lib/types/market';
+  import { supabaseClient } from '$lib/supabaseClient';
 
   let isScrolled = false;
   let isMobileMenuOpen = false;
   let isMarketDropdownOpen = false;
-  let loading = true;
+  let loading = false;
   let markets: Market[] = [];
+  let searchQuery = '';
+  let isUserMenuOpen = false;
+  let username = '';
 
   const navLinks = [
     { href: '/', text: 'Beranda' },
     { type: 'dropdown', text: 'Pasaran Lomba' },
     { href: '/about', text: 'Tentang Kami' },
-    { href: '/faq', text: 'FAQ' },
     { href: '/contact', text: 'Kontak' }
   ];
 
@@ -59,8 +59,15 @@
     return { text: 'TUTUP', color: 'text-red-400' };
   }
   
-  // Sort markets berdasarkan status dan waktu tutup
-  $: sortedMarkets = [...markets].sort((a, b) => {
+  // Filter markets berdasarkan pencarian
+  $: filteredMarkets = markets.filter(market =>
+    searchQuery
+      ? market.name.toLowerCase().includes(searchQuery.toLowerCase())
+      : true
+  );
+  
+  // Sort filtered markets berdasarkan status dan waktu tutup
+  $: sortedAndFilteredMarkets = [...filteredMarkets].sort((a, b) => {
     const statusA = getMarketStatusPriority(a);
     const statusB = getMarketStatusPriority(b);
     
@@ -75,6 +82,10 @@
     return 0;
   });
 
+  // Sort filtered markets dan terapkan limit jika ada
+  $: limitedMarkets = sortedAndFilteredMarkets.slice(0, 5);
+  $: hasMoreMarkets = sortedAndFilteredMarkets.length > 5;
+
   async function fetchMarkets() {
     try {
       const response = await fetch('/api/markets');
@@ -88,11 +99,14 @@
   }
 
   async function handleLogout() {
+    loading = true;
     try {
       await user.signOut();
       goto('/');
     } catch (error) {
       console.error('Error signing out:', error);
+    } finally {
+      loading = false;
     }
   }
 
@@ -107,9 +121,33 @@
     return () => window.removeEventListener('scroll', handleScroll);
   });
 
+  onMount(async () => {
+    if ($user?.email) {
+      const { data, error } = await supabaseClient
+        .from('users')
+        .select('username')
+        .eq('email', $user.email)
+        .single();
+      
+      if (data) {
+        username = data.username;
+      }
+    }
+  });
+
   function closeMenu() {
     isMobileMenuOpen = false;
     isMarketDropdownOpen = false;
+  }
+
+  // Fungsi untuk menutup menu user
+  function closeUserMenu() {
+    isUserMenuOpen = false;
+  }
+
+  // Fungsi untuk toggle menu user
+  function toggleUserMenu() {
+    isUserMenuOpen = !isUserMenuOpen;
   }
 </script>
 
@@ -150,9 +188,34 @@
                   on:mouseleave={() => isMarketDropdownOpen = false}
                   transition:slide={{ duration: 200 }}
                 >
+                  <!-- Search input -->
+                  <div class="p-3 border-b border-gray-800">
+                    <div class="relative">
+                      <input
+                        type="text"
+                        bind:value={searchQuery}
+                        placeholder="Cari pasaran..."
+                        class="w-full bg-[#1a1a1a] text-white px-4 py-2 pr-10 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020] text-sm"
+                      />
+                      <svg 
+                        class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path 
+                          stroke-linecap="round" 
+                          stroke-linejoin="round" 
+                          stroke-width="2" 
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
+                        />
+                      </svg>
+                    </div>
+                  </div>
+
                   <div class="max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar">
-                    {#if sortedMarkets.length > 0}
-                      {#each sortedMarkets as market}
+                    {#if sortedAndFilteredMarkets.length > 0}
+                      {#each limitedMarkets as market}
                         {@const status = getMarketStatus(market)}
                         <a
                           href="/lomba/{market.name}"
@@ -180,9 +243,22 @@
                           </div>
                         </a>
                       {/each}
+
+                      {#if hasMoreMarkets}
+                        <a 
+                          href="/lomba"
+                          class="flex items-center justify-between px-4 py-3 hover:bg-[#1a1a1a] transition-colors border-t border-gray-800/50 text-gray-400 hover:text-white group"
+                          on:click={closeMenu}
+                        >
+                          <span class="text-sm">Lihat Seluruh Pasaran</span>
+                          <svg class="w-4 h-4 transform transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                          </svg>
+                        </a>
+                      {/if}
                     {:else}
-                      <div class="px-4 py-3 text-sm text-gray-400">
-                        Tidak ada pasaran tersedia
+                      <div class="px-4 py-3 text-sm text-gray-400 text-center">
+                        {searchQuery ? 'Tidak ada pasaran yang cocok' : 'Tidak ada pasaran tersedia'}
                       </div>
                     {/if}
                   </div>
@@ -202,23 +278,54 @@
         <!-- CTA Buttons -->
         <div class="flex items-center space-x-4">
           {#if $user}
-            <button
-              on:click={handleLogout}
-              disabled={loading}
-              class="flex items-center space-x-2 px-5 py-2.5 text-sm font-medium text-white bg-[#e62020]/10 hover:bg-[#e62020]/20 rounded-lg transition-all duration-300 disabled:opacity-50 border border-[#e62020]/20"
-            >
-              {#if loading}
-                <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+            <div class="relative">
+              <button
+                on:click={toggleUserMenu}
+                class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#222] transition-all duration-300"
+              >
+                <div class="w-8 h-8 rounded-full bg-[#e62020] flex items-center justify-center text-white font-medium text-sm">
+                  {(username || $user.email).charAt(0).toUpperCase()}
+                </div>
+                <div class="flex flex-col items-start">
+                  <span class="text-sm font-medium text-white">{username || $user.email}</span>
+                  <span class="text-xs text-gray-400">Member</span>
+                </div>
+                <svg class="w-4 h-4" fill="none" stroke="#ffffff" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
-              {:else}
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                </svg>
+              </button>
+
+              {#if isUserMenuOpen}
+                <div class="absolute right-0 mt-2 w-56 bg-[#222] rounded-lg shadow-xl border border-gray-800 overflow-hidden">
+                  <div class="px-4 py-3 bg-[#1a1a1a] border-b border-gray-800">
+                    <p class="text-sm font-medium text-white">{username || $user.email}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">Member sejak {new Date($user.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' })}</p>
+                  </div>
+                  <a
+                    href="/profile"
+                    on:click={closeUserMenu}
+                    class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1a1a1a] hover:text-white transition-colors"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Profil Saya
+                  </a>
+                  <button
+                    on:click={() => {
+                      closeUserMenu();
+                      handleLogout();
+                    }}
+                    class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-[#1a1a1a] hover:text-red-500 transition-colors"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Keluar
+                  </button>
+                </div>
               {/if}
-              <span>{loading ? 'Loading...' : 'Keluar'}</span>
-            </button>
+            </div>
           {:else}
             <a 
               href="/login" 
@@ -277,7 +384,7 @@
     <!-- Mobile Navigation -->
     {#if isMobileMenuOpen}
       <div 
-        class="md:hidden bg-[#1a1a1a] border-t border-gray-800"
+        class="md:hidden bg-[#1a1a1a] border-t border-gray-800 overflow-y-auto custom-scrollbar max-h-[calc(106vh-120px)]"
         transition:slide={{ duration: 300 }}
       >
         <div class="flex flex-col py-4">
@@ -299,13 +406,41 @@
               </button>
               
               {#if isMarketDropdownOpen}
-                <div class="bg-[#1a1a1a]/50 pl-8 overflow-y-auto custom-scrollbar max-h-[calc(90vh-120px)]" transition:slide={{ duration: 200 }}>
-                  {#if sortedMarkets.length > 0}
-                    {#each sortedMarkets as market}
+                <div class="bg-[#1a1a1a]/50 pl-8" transition:slide={{ duration: 200 }}>
+                  <!-- Search input untuk mobile -->
+                  <div class="px-4 py-3">
+                    <div class="relative">
+                      <input
+                        type="text"
+                        bind:value={searchQuery}
+                        placeholder="Cari pasaran..."
+                        class="w-full bg-[#1a1a1a] text-white px-4 py-2 pr-10 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020] text-sm"
+                      />
+                      <svg 
+                        class="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path 
+                          stroke-linecap="round" 
+                          stroke-linejoin="round" 
+                          stroke-width="2" 
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
+                        />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <!-- Divider -->
+                  <div class="border-b border-gray-800/50 mx-4 mb-2"></div>
+
+                  {#if sortedAndFilteredMarkets.length > 0}
+                    {#each limitedMarkets as market}
                       {@const status = getMarketStatus(market)}
                       <a
                         href="/lomba/{market.name}"
-                        class="flex items-center space-x-3 px-4 py-3 hover:bg-gray-800 transition-colors text-sm text-gray-300 hover:text-white"
+                        class="flex items-center gap-3 px-4 py-3 hover:bg-gray-800 transition-colors border-b border-gray-800/50 last:border-0"
                         on:click={closeMenu}
                       >
                         <img
@@ -315,13 +450,36 @@
                         />
                         <div class="flex-1 min-w-0">
                           <p class="text-sm text-gray-300 truncate">{market.name}</p>
-                          <p class="text-[10px] {status.color} font-medium">{status.text} ({market.buka} - {market.tutup})</p>
+                          <div class="flex items-center gap-2 mt-1">
+                            <span class="text-[10px] font-medium px-1.5 py-0.5 rounded
+                              {status.text === 'BUKA' ? 'bg-green-500/10 text-green-500' : 
+                               status.text === 'BELUM DIMULAI' ? 'bg-yellow-500/10 text-yellow-500' : 
+                               'bg-red-500/10 text-red-500'}">
+                              {status.text}
+                            </span>
+                            <span class="text-[10px] text-gray-500">
+                              {market.buka} - {market.tutup}
+                            </span>
+                          </div>
                         </div>
                       </a>
                     {/each}
+
+                    {#if hasMoreMarkets}
+                      <a 
+                        href="/lomba"
+                        class="flex items-center justify-between px-4 py-3 hover:bg-[#1a1a1a] transition-colors border-t border-gray-800/50 text-gray-400 hover:text-white group"
+                        on:click={closeMenu}
+                      >
+                        <span class="text-sm">Lihat Seluruh Pasaran</span>
+                        <svg class="w-4 h-4 transform transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                        </svg>
+                      </a>
+                    {/if}
                   {:else}
-                    <div class="px-4 py-3 text-sm text-gray-400">
-                      Tidak ada pasaran tersedia
+                    <div class="px-4 py-3 text-sm text-gray-400 text-center">
+                      {searchQuery ? 'Tidak ada pasaran yang cocok' : 'Tidak ada pasaran tersedia'}
                     </div>
                   {/if}
                 </div>
@@ -339,24 +497,54 @@
           
           <div class="border-t border-gray-800 mt-4 pt-4 px-4 space-y-3">
             {#if $user}
-              <button
-                on:click={handleLogout}
-                disabled={loading}
-                class="flex items-center w-full space-x-2 px-5 py-3 text-sm font-medium text-white bg-[#e62020]/10 hover:bg-[#e62020]/20 rounded-lg transition-all duration-300 disabled:opacity-50 border border-[#e62020]/20"
-                on:click={closeMenu}
-              >
-                {#if loading}
-                  <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+              <div class="relative">
+                <button
+                  on:click={toggleUserMenu}
+                  class="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-[#222] transition-all duration-300"
+                >
+                  <div class="w-10 h-10 rounded-full bg-[#e62020] flex items-center justify-center text-white font-medium">
+                    {(username || $user.email).charAt(0).toUpperCase()}
+                  </div>
+                  <div class="flex flex-col items-start flex-1">
+                    <span class="text-sm font-medium text-white">{username || $user.email}</span>
+                    <span class="text-xs text-gray-400">Member</span>
+                  </div>
+                  <svg class="w-4 h-4" fill="none" stroke="#ffffff" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
-                {:else}
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                  </svg>
+                </button>
+
+                {#if isUserMenuOpen}
+                  <div class="mt-2 bg-[#222] rounded-lg shadow-xl border border-gray-800 overflow-hidden">
+                    <div class="px-4 py-3 bg-[#1a1a1a] border-b border-gray-800">
+                      <p class="text-sm font-medium text-white">{username || $user.email}</p>
+                      <p class="text-xs text-gray-400 mt-0.5">Member sejak {new Date($user.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' })}</p>
+                    </div>
+                    <a
+                      href="/profile"
+                      on:click={closeUserMenu}
+                      class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-[#1a1a1a] hover:text-white transition-colors"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      Profil Saya
+                    </a>
+                    <button
+                      on:click={() => {
+                        closeUserMenu();
+                        handleLogout();
+                      }}
+                      class="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-[#1a1a1a] hover:text-red-500 transition-colors"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Keluar
+                    </button>
+                  </div>
                 {/if}
-                <span>{loading ? 'Loading...' : 'Keluar'}</span>
-              </button>
+              </div>
             {:else}
               <a 
                 href="/login" 
