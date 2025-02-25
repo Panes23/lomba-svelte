@@ -52,7 +52,7 @@
   });
 </script>
 
-<div class="space-y-6">
+<div class="space-y-6 px-6 py-10">
   <div class="flex items-center justify-between">
     <h1 class="text-2xl font-bold text-white">List Lomba</h1>
     <div class="flex items-center gap-4">

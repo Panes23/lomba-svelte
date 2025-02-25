@@ -2,11 +2,12 @@
   import { MetaTags } from 'svelte-meta-tags';
   import { supabaseClient } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
+  import Swal from 'sweetalert2';
 
   let username = '';
   let email = '';
   let phone = '';
-  let birthDate = '';
+  let birth_date = '';
   let password = '';
   let confirmPassword = '';
   let loading = false;
@@ -21,36 +22,67 @@
 
       loading = true;
 
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      // Cek apakah username sudah dipakai
+      const { data: existingUser, error: checkError } = await supabaseClient
+        .from('users')
+        .select('username')
+        .eq('username', username)
+        .single();
+
+      if (existingUser) {
+        throw new Error('Username sudah digunakan');
+      }
+
+      // Register dengan Supabase Auth
+      const { data, error } = await supabaseClient.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            username,
+            phone,
+            birth_date
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      // Insert ke tabel users
+      const { error: insertError } = await supabaseClient
+        .from('users')
+        .insert({
+          id: data.user?.id,
           username,
           email,
           phone,
-          birthDate,
-          password
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-          throw new Error(data.error);
-      }
-      
-      // Set success message if provided
-      if (data.message) {
-        error = null;
-        successMessage = data.message;
-      }
+          birth_date,
+          auth_uid: data.user?.id
+        });
 
-      goto('/login?registered=true&email=' + encodeURIComponent(email));
-    } catch (err) {
-      successMessage = null;
-      error = err.message;
+      if (insertError) throw insertError;
+
+      // Tampilkan popup sukses
+      await Swal.fire({
+        title: 'Pendaftaran Berhasil!',
+        text: 'Silakan cek email Anda untuk konfirmasi akun.',
+        icon: 'success',
+        confirmButtonColor: '#e62020',
+        confirmButtonText: 'OK'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          goto('/login');
+        }
+      });
+
+    } catch (error) {
+      console.error('Error:', error);
+      await Swal.fire({
+        title: 'Error!',
+        text: error.message || 'Gagal mendaftar',
+        icon: 'error',
+        confirmButtonColor: '#e62020'
+      });
     } finally {
       loading = false;
     }
@@ -123,11 +155,11 @@
         </div>
 
         <div class="mb-6">
-          <label for="birthDate" class="block text-gray-400 mb-2">Tanggal Lahir</label>
+          <label for="birth_date" class="block text-gray-400 mb-2">Tanggal Lahir</label>
           <input
             type="date"
-            id="birthDate"
-            bind:value={birthDate}
+            id="birth_date"
+            bind:value={birth_date}
             class="w-full bg-[#1a1a1a] text-white rounded-lg px-4 py-3 border border-gray-800 focus:outline-none focus:border-[#e62020]"
             required
           />

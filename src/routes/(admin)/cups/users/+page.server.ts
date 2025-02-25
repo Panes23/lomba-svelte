@@ -1,22 +1,31 @@
 import { supabaseClient } from '$lib/supabaseClient';
 import type { PageServerLoad } from './$types';
+import { error } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ cookies }) => {
   try {
-    const { data: users, error } = await supabaseClient
+    // Cek admin data dari cookie
+    const adminData = cookies.get('admin_data');
+    if (!adminData) {
+      throw error(401, 'Not authenticated');
+    }
+    const admin = JSON.parse(adminData);
+
+    const { data: users, error: usersError } = await supabaseClient
       .from('users')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (usersError) throw usersError;
 
     return {
-      users: users || []
+      users: users || [],
+      admin: null
     };
-  } catch (error) {
-    console.error('Error:', error);
+  } catch (err) {
     return {
-      users: []
+      users: [],
+      admin: null
     };
   }
 }; 

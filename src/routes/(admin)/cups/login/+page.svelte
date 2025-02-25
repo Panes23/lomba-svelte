@@ -56,7 +56,7 @@
   }
 </script>
 
-<div class="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-4">
+<div class="min-h-screen bg-[#1a1a1a] flex justify-center p-4 pt-32">
   <div class="w-full max-w-sm">
     <!-- Logo & Title -->
     <div class="text-center mb-8">
@@ -105,6 +105,15 @@
       >
         {loading ? 'Loading...' : 'Login'}
       </button>
+
+      <div class="text-center mt-4">
+        <a 
+          href="/cups/lupa-password"
+          class="text-sm text-gray-400 hover:text-white transition-colors"
+        >
+          Lupa Password?
+        </a>
+      </div>
     </form>
   </div>
 </div> 

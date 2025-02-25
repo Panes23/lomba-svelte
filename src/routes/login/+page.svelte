@@ -2,57 +2,62 @@
   import { MetaTags } from 'svelte-meta-tags';
   import { supabaseClient } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
-  import { invalidate } from '$app/navigation';
-  import { user } from '$lib/stores/authStore';
   import Swal from '$lib/utils/swal';
 
   let identifier = '';
   let password = '';
   let loading = false;
-  let error = null;
+  let errorMessage = '';
+  let isEmailUnconfirmed = false;
 
   async function handleLogin() {
-    loading = true;
     try {
-      // Coba login
-      const { error } = await user.signIn(identifier, password);
+      loading = true;
+      errorMessage = '';
+      isEmailUnconfirmed = false;
 
-      if (error) {
-        // Cek apakah user ada
-        const { data: userData } = await supabaseClient
+      // Cek apakah input adalah email atau username
+      const isEmail = identifier.includes('@');
+      
+      // Jika username, cari email dari database dulu
+      let loginEmail = identifier;
+      if (!isEmail) {
+        const { data: userData, error: userError } = await supabaseClient
           .from('users')
           .select('email')
-          .or(`email.eq.${identifier},username.eq.${identifier}`)
+          .eq('username', identifier)
           .single();
-        
-        if (!userData) {
-          await Swal.fire({
-            title: 'Opps!',
-            text: 'Username atau email belum terdaftar',
-            icon: 'error',
-            confirmButtonColor: '#e62020'
-          });
-        } else {
-          await Swal.fire({
-            title: 'Opps!',
-            text: 'Password yang anda masukkan salah',
-            icon: 'error',
-            confirmButtonColor: '#e62020'
-          });
+
+        if (userError || !userData) {
+          errorMessage = 'Username tidak ditemukan';
+          return;
         }
-        loading = false;
+        
+        loginEmail = userData.email;
+      }
+
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: loginEmail,
+        password: password
+      });
+
+      if (error) {
+        if (error.status === 400 && error.message === 'Email not confirmed') {
+          isEmailUnconfirmed = true;
+          errorMessage = 'Email belum dikonfirmasi';
+          return;
+        }
+        if (error.status === 400 && error.message === 'Invalid login credentials') {
+          errorMessage = 'Email atau password salah';
+          return;
+        }
+        errorMessage = error.message;
         return;
       }
 
       goto('/');
     } catch (error) {
-      console.error('Error:', error);
-      await Swal.fire({
-        title: 'Opps!',
-        text: 'Pastikan kembali email/username dan password anda',
-        icon: 'error',
-        confirmButtonColor: '#e62020'
-      });
+      errorMessage = error.message;
     } finally {
       loading = false;
     }
@@ -80,9 +85,15 @@
 
       <!-- Form Login -->
       <form on:submit|preventDefault={handleLogin} class="bg-[#222] rounded-xl p-6 border border-gray-800">
-        {#if error}
+        {#if errorMessage}
           <div class="bg-red-500/10 text-red-500 p-4 rounded-lg mb-6">
-            {error}
+            {errorMessage}
+            {#if isEmailUnconfirmed}
+              <p class="mt-2 text-sm">
+                Silakan cek inbox email Anda untuk melakukan konfirmasi. 
+                Jika email konfirmasi tidak ditemukan, periksa folder spam/junk.
+              </p>
+            {/if}
           </div>
         {/if}
 

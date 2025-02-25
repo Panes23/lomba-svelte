@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Swal from '$lib/utils/swal';
 
   let loading = false;
   let searchQuery = '';
@@ -34,7 +35,7 @@
   );
 </script>
 
-<div class="space-y-6">
+<div class="space-y-6 px-6 py-10">
   <div class="flex items-center justify-between">
     <h1 class="text-2xl font-bold text-white">List Users</h1>
     <div class="w-64">
