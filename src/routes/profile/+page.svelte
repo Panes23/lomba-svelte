@@ -3,7 +3,7 @@
   import { user } from '$lib/stores/authStore';
   import Swal from '$lib/utils/swal';
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
 
   let loading = false;
   let username = '';
@@ -16,38 +16,46 @@
   let confirmPassword = '';
 
   onMount(async () => {
-    // Ambil session dari cookie
-    const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+    // Cek cookie yang ada
+    const cookies = document.cookie.split(';');
+    const authCookie = cookies.find(c => c.trim().startsWith('sb-access-token='));
     
-    if (session?.user) {
-      loading = true;
-      try {
-        // Ambil data dari tabel users
-        const { data: userData, error: userError } = await supabaseClient
-          .from('users')
-          .select(`
-            id,
-            username, 
-            email,
-            phone,
-            birth_date
-          `)
-          .eq('email', session.user.email)
-          .single();
+    if (!authCookie) {
+      // Redirect ke halaman login jika tidak ada session
+      goto('/');
+      return;
+    }
 
-        if (userError) throw userError;
+    try {
+      // Parse cookie data
+      const cookieValue = authCookie.split('=')[1].trim();
+      const base64Data = cookieValue.replace('base64-', '');
+      const data = JSON.parse(atob(base64Data));
+      
+      if (data.user) {
+        loading = true;
+        try {
+          // Ambil data dari API endpoint
+          const response = await fetch(`/api/profile?email=${data.user.email}`);
+          const userData = await response.json();
 
-        if (userData) {
-          username = userData.username;
-          email = userData.email;
-          phone = userData.phone || '';
-          birth_date = userData.birth_date || '';
+          if (!response.ok) throw new Error('Failed to fetch profile data');
+
+          if (userData) {
+            username = userData.username;
+            email = userData.email;
+            phone = userData.phone || '';
+            birth_date = userData.birth_date || '';
+          }
+        } catch (error) {
+          console.error('Error:', error);
+        } finally {
+          loading = false;
         }
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        loading = false;
       }
+    } catch (err) {
+      console.error('Error parsing auth cookie:', err);
+      goto('/');
     }
   });
 

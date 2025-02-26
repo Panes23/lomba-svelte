@@ -9,10 +9,48 @@ function createUserStore() {
     subscribe,
     set,
     initialize: async () => {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (session) {
-        set(session.user);
-      } else {
+      try {
+        // Cek cookie yang ada
+        const cookies = document.cookie.split(';');
+        
+        // Cek cookie admin dan supabase auth token
+        const hasAdminCookie = cookies.some(c => {
+          const [name, value] = c.trim().split('=');
+          return name === 'admin_data' && value?.includes('auth-token');
+        });
+
+        const hasSupabaseAuthCookie = cookies.some(c => {
+          const [name] = c.trim().split('=');
+          return name.includes('-auth-token');
+        });
+        
+        // Jika ada cookie admin atau supabase auth token, skip inisialisasi
+        if (hasAdminCookie || hasSupabaseAuthCookie) {
+          set(null);
+          return;
+        }
+
+        const authCookie = cookies.find(c => c.trim().startsWith('sb-access-token='));
+        if (authCookie) {
+          // Parse cookie data
+          const cookieValue = authCookie.split('=')[1].trim();
+          const base64Data = cookieValue.replace('base64-', '');
+          const data = JSON.parse(atob(base64Data));
+          
+          if (data.user) {
+            set(data.user);
+            return;
+          }
+        }
+
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+          set(session.user);
+        } else {
+          set(null);
+        }
+      } catch (err) {
+        console.error('Error initializing auth store:', err);
         set(null);
       }
     },
@@ -53,6 +91,8 @@ function createUserStore() {
     },
     signOut: async () => {
       await supabaseClient.auth.signOut();
+      // Hapus cookie saat logout
+      document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
       set(null);
     }
   };

@@ -6,6 +6,7 @@
   import { user } from '$lib/stores/authStore';
   import type { Market } from '$lib/types/market';
   import { supabaseClient } from '$lib/supabaseClient';
+  import { writable } from 'svelte/store';
 
   let isScrolled = false;
   let isMobileMenuOpen = false;
@@ -14,7 +15,7 @@
   let markets: Market[] = [];
   let searchQuery = '';
   let isUserMenuOpen = false;
-  let username = '';
+  const username = writable('');
 
   const navLinks = [
     { href: '/', text: 'Beranda' },
@@ -120,20 +121,6 @@
     fetchMarkets();
     return () => window.removeEventListener('scroll', handleScroll);
   });
-
-  // Reactive statement untuk update username ketika user berubah
-  $: if ($user?.email) {
-    supabaseClient
-      .from('users')
-      .select('username')
-      .eq('email', $user.email)
-      .single()
-      .then(({ data }) => {
-        if (data) {
-          username = data.username;
-        }
-      });
-  }
 
   function closeMenu() {
     isMobileMenuOpen = false;
@@ -284,10 +271,10 @@
                 class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#222] transition-all duration-300"
               >
                 <div class="w-8 h-8 rounded-full bg-[#e62020] flex items-center justify-center text-white font-medium text-sm">
-                  {(username || $user.email).charAt(0).toUpperCase()}
+                  {($username || $user.email).charAt(0).toUpperCase()}
                 </div>
                 <div class="flex flex-col items-start">
-                  <span class="text-sm font-medium text-white">{username || $user.email}</span>
+                  <span class="text-sm font-medium text-white">{$username || $user.email}</span>
                   <span class="text-xs text-gray-400">Member</span>
                 </div>
                 <svg class="w-4 h-4" fill="none" stroke="#ffffff" viewBox="0 0 24 24">
@@ -298,7 +285,7 @@
               {#if isUserMenuOpen}
                 <div class="absolute right-0 mt-2 w-56 bg-[#222] rounded-lg shadow-xl border border-gray-800 overflow-hidden">
                   <div class="px-4 py-3 bg-[#1a1a1a] border-b border-gray-800">
-                    <p class="text-sm font-medium text-white">{username || $user.email}</p>
+                    <p class="text-sm font-medium text-white">{$username || $user.email}</p>
                     <p class="text-xs text-gray-400 mt-0.5">Member sejak {new Date($user.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' })}</p>
                   </div>
                   <a
@@ -503,10 +490,10 @@
                   class="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-[#222] transition-all duration-300"
                 >
                   <div class="w-10 h-10 rounded-full bg-[#e62020] flex items-center justify-center text-white font-medium">
-                    {(username || $user.email).charAt(0).toUpperCase()}
+                    {($username || $user.email).charAt(0).toUpperCase()}
                   </div>
                   <div class="flex flex-col items-start flex-1">
-                    <span class="text-sm font-medium text-white">{username || $user.email}</span>
+                    <span class="text-sm font-medium text-white">{$username || $user.email}</span>
                     <span class="text-xs text-gray-400">Member</span>
                   </div>
                   <svg class="w-4 h-4" fill="none" stroke="#ffffff" viewBox="0 0 24 24">
@@ -517,7 +504,7 @@
                 {#if isUserMenuOpen}
                   <div class="mt-2 bg-[#222] rounded-lg shadow-xl border border-gray-800 overflow-hidden">
                     <div class="px-4 py-3 bg-[#1a1a1a] border-b border-gray-800">
-                      <p class="text-sm font-medium text-white">{username || $user.email}</p>
+                      <p class="text-sm font-medium text-white">{$username || $user.email}</p>
                       <p class="text-xs text-gray-400 mt-0.5">Member sejak {new Date($user.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' })}</p>
                     </div>
                     <a

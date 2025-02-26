@@ -1,7 +1,18 @@
-<script>
+<script lang="ts">
+  import { onMount } from 'svelte';
   import MarketCard from '$lib/components/MarketCard.svelte';
-  import Slider from '$lib/components/Slider.svelte';
   import Article from '$lib/components/Article.svelte';
+  import Slider from '$lib/components/Slider.svelte';
+
+  let SliderComponent;
+
+  onMount(async () => {
+    // Dynamically import Slider component
+    const module = await import('$lib/components/Slider.svelte');
+    SliderComponent = module.default;
+  });
+
+  export let data;
 </script>
 
 <svelte:head>
@@ -39,18 +50,18 @@
   <!-- Additional Meta -->
   <meta name="theme-color" content="#e62020">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta charset="utf-8">
 </svelte:head>
 
 <div class="container mx-auto px-4">
   <!-- Slider -->
   <div class="pt-24">
-    <Slider />
+    <Slider {data} />
   </div>
 
   <!-- Market Section -->
   <section class="py-12">
-    <div class="container">
+    <div>
       <div class="max-w-7xl mx-auto">
         <div class="text-center mb-8">
           <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">

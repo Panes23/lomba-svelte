@@ -43,7 +43,7 @@
     };
     
     // Jika result sudah ada, return status SELESAI
-    if (lomba?.result !== null) return {
+    if (lomba?.result !== "") return {
       text: 'SELESAI',
       color: 'text-blue-400',
       bg: 'bg-blue-400/10',
@@ -432,7 +432,7 @@
           <!-- Result Section -->
           <div class="bg-gradient-to-br from-[#1a1a1a] to-[#222] p-4 sm:p-6 rounded-lg sm:rounded-xl border border-gray-800 text-center shadow-lg">
             <p class="text-sm text-gray-400 mb-2">Hasil</p>
-            {#if lomba.result !== null}
+            {#if lomba.result !== ""}
               <p class="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-[#e62020] to-[#ff0000] text-transparent bg-clip-text">{lomba.result}</p>
             {:else}
               <p class="text-xl sm:text-2xl text-gray-600 font-medium">Belum Result</p>
@@ -469,7 +469,7 @@
           </div>
 
           <!-- Winners Section -->
-          {#if lomba.result !== null}
+          {#if lomba.result !== ""}
             <div class="mt-4 sm:mt-6 bg-gradient-to-br from-[#1a1a1a] to-[#222] p-3 sm:p-6 rounded-lg sm:rounded-xl border border-gray-800 shadow-lg">
               <div class="flex justify-between items-center mb-4">
                 <p class="text-xs sm:text-sm text-gray-400">Pemenang</p>

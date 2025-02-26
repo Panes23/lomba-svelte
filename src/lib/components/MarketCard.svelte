@@ -139,7 +139,7 @@
   {/if}
 
   {#if loading}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {#each Array(6) as _, i}
         <div class="bg-gradient-to-br from-[#1a1a1a] to-[#222] rounded-2xl border border-gray-800/50 overflow-hidden shadow-xl shadow-black/20 backdrop-blur-sm">
           <!-- Skeleton Image -->
@@ -174,7 +174,7 @@
       {/each}
     </div>
   {:else}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {#each displayedMarkets as market}
         {@const status = getMarketStatus(market)}
         <div 

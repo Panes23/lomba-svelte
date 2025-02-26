@@ -1,7 +1,7 @@
 <script lang="ts">
   import { MetaTags } from 'svelte-meta-tags';
-  import { supabaseClient } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
+  import { user } from '$lib/stores/authStore';
   import Swal from '$lib/utils/swal';
 
   let identifier = '';
@@ -9,6 +9,8 @@
   let loading = false;
   let errorMessage = '';
   let isEmailUnconfirmed = false;
+  let showPassword = false;
+  let loginAttempts = 0;
 
   async function handleLogin() {
     try {
@@ -16,44 +18,64 @@
       errorMessage = '';
       isEmailUnconfirmed = false;
 
-      // Cek apakah input adalah email atau username
-      const isEmail = identifier.includes('@');
-      
-      // Jika username, cari email dari database dulu
-      let loginEmail = identifier;
-      if (!isEmail) {
-        const { data: userData, error: userError } = await supabaseClient
-          .from('users')
-          .select('email')
-          .eq('username', identifier)
-          .single();
-
-        if (userError || !userData) {
-          errorMessage = 'Username tidak ditemukan';
-          return;
-        }
-        
-        loginEmail = userData.email;
-      }
-
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email: loginEmail,
-        password: password
+      // Gunakan endpoint lokal untuk login
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          identifier,
+          password
+        })
       });
 
-      if (error) {
-        if (error.status === 400 && error.message === 'Email not confirmed') {
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.error.includes('Email belum dikonfirmasi')) {
           isEmailUnconfirmed = true;
-          errorMessage = 'Email belum dikonfirmasi';
-          return;
         }
-        if (error.status === 400 && error.message === 'Invalid login credentials') {
-          errorMessage = 'Email atau password salah';
-          return;
+        errorMessage = data.error;
+        
+        // Increment login attempts jika error username/password salah
+        if (data.error === 'Username/Email atau password salah') {
+          loginAttempts++;
+          
+          // Cek jika sudah 3x gagal
+          if (loginAttempts >= 3) {
+            const result = await Swal.fire({
+              title: 'Login Gagal',
+              text: 'Anda telah gagal login sebanyak 3 kali. Apakah Anda lupa password atau belum memiliki akun di tebakangka.com?',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonColor: '#e62020',
+              cancelButtonColor: '#3085d6',
+              confirmButtonText: 'Lupa Password',
+              cancelButtonText: 'Daftar Akun'
+            });
+            
+            if (result.isConfirmed) {
+              goto('/lupa-password');
+            } else if (result.dismiss === Swal.DismissReason.cancel) {
+              goto('/register');
+            }
+          }
         }
-        errorMessage = error.message;
         return;
       }
+
+      // Set cookie dengan format yang benar
+      const cookieData = {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_at: data.session.expires_at,
+        user: data.user
+      };
+      document.cookie = `sb-access-token=base64-${btoa(JSON.stringify(cookieData))}; path=/; max-age=3600; secure; samesite=strict`;
+
+      // Update user store
+      user.set(data.user);
 
       goto('/');
     } catch (error) {
@@ -110,13 +132,40 @@
 
         <div class="mb-6">
           <label for="password" class="block text-gray-400 mb-2">Password</label>
-          <input
-            type="password"
-            id="password"
-            bind:value={password}
-            class="w-full bg-[#1a1a1a] text-white rounded-lg px-4 py-3 border border-gray-800 focus:outline-none focus:border-[#e62020]"
-            required
-          />
+          <div class="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              id="password"
+              bind:value={password}
+              class="w-full bg-[#1a1a1a] text-white rounded-lg px-4 py-3 border border-gray-800 focus:outline-none focus:border-[#e62020]"
+              required
+            />
+            <button 
+              type="button"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              on:click={() => showPassword = !showPassword}
+            >
+              {#if showPassword}
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+              {:else}
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              {/if}
+            </button>
+          </div>
+        </div>
+
+        <div class="flex justify-end mb-6">
+          <a 
+            href="/lupa-password"
+            class="text-sm text-[#e62020] hover:text-[#ff0000] transition-colors"
+          >
+            Lupa Password?
+          </a>
         </div>
 
         <button

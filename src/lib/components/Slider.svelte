@@ -1,12 +1,21 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import SliderSkeleton from './SliderSkeleton.svelte';
+  import { slidesStore } from '$lib/stores/slidesStore';
+  import { invalidate } from '$app/navigation';
 
-  export let images: string[] = [];
+  // Page options
+  export const prerender = false;
+  export const ssr = false;
+  export const csr = true;
+
+  // Props
   export let interval = 3000;
-  
+  export let data: { slides: any[] };
+
+  // Local state
   let currentIndex = 0;
   let timer: NodeJS.Timeout;
   let loading = true;
@@ -14,119 +23,167 @@
   let isPaused = false;
   let touchStart = 0;
   let touchEnd = 0;
+  let isMobile = false;
+  $: slides = data.slides || [];
 
-  // Fungsi untuk mengambil data slider
-  async function fetchSlides() {
-    try {
-      const response = await fetch('/api/slider');
-      const data = await response.json();
+  // Reset slider ketika data berubah
+  $: if (slides) {
+    currentIndex = 0;
+    if (timer) {
+      clearInterval(timer);
+      startSlider();
+    }
+  }
 
-      if (!response.ok) throw new Error(data.error);
-      images = data.map(slide => slide.image);
-    } catch (err) {
-      error = err.message;
-      console.error('Error:', err);
-    } finally {
-      loading = false;
+  function startSlider() {
+    timer = setInterval(() => {
+      if (!isPaused && slides.length > 0) {
+        currentIndex = (currentIndex + 1) % slides.length;
+      }
+    }, interval);
+  }
+
+  function checkMobile() {
+    isMobile = window.innerWidth <= 768;
+  }
+
+  function handleTouchStart(e: TouchEvent) {
+    touchStart = e.touches[0].clientX;
+  }
+
+  function handleTouchEnd(e: TouchEvent) {
+    touchEnd = e.changedTouches[0].clientX;
+    const swipeDistance = touchEnd - touchStart;
+    
+    if (Math.abs(swipeDistance) > 50) {
+      if (swipeDistance > 0) {
+        currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+      } else {
+        currentIndex = (currentIndex + 1) % slides.length;
+      }
     }
   }
 
   onMount(() => {
-    fetchSlides();
     startSlider();
-    return () => clearInterval(timer);
-  });
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
 
-  function startSlider() {
-    timer = setInterval(() => {
-      currentIndex = (currentIndex + 1) % images.length;
-    }, interval);
-  }
-
-  function stopAutoplay() {
-    if (timer) {
-      clearInterval(timer);
+    try {
+      loading = true;
+      slidesStore.fetch();
+    } catch (err) {
+      error = err.message;
+    } finally {
+      loading = false;
     }
-  }
+
+    return () => {
+      slidesStore.destroy();
+      clearInterval(timer);
+      window.removeEventListener('resize', checkMobile);
+    };
+  });
 </script>
 
 {#if loading}
   <SliderSkeleton />
-{:else}
-  <div class="relative w-full h-[400px] overflow-hidden rounded-2xl border border-gray-800/50 bg-gradient-to-br from-[#1a1a1a] to-[#222] shadow-xl shadow-black/20 backdrop-blur-sm group">
-    <!-- Decorative Elements -->
-    <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-    <div class="absolute -right-32 -top-32 h-64 w-64 rounded-full bg-[#e62020]/5 blur-3xl group-hover:bg-[#e62020]/10 transition-all duration-500" />
-    <div class="absolute -left-32 -bottom-32 h-64 w-64 rounded-full bg-[#e62020]/5 blur-3xl group-hover:bg-[#e62020]/10 transition-all duration-500" />
-
-    {#if error}
-      <div class="absolute inset-0 bg-[#1a1a1a] flex items-center justify-center">
-        <div class="text-[#e62020] text-center">
-          <svg class="w-12 h-12 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <p class="text-lg font-medium">{error}</p>
-        </div>
-      </div>
-    {/if}
-
-    {#each images as image, index}
-      {#if index === currentIndex}
+{:else if error}
+  <div class="text-center text-red-500 py-8">
+    {error}
+  </div>
+{:else if slides.length > 0}
+  <div 
+    class="relative h-[400px] md:h-[500px] rounded-xl overflow-hidden group"
+    on:mouseenter={() => isPaused = true}
+    on:mouseleave={() => isPaused = false}
+    on:touchstart={handleTouchStart}
+    on:touchend={handleTouchEnd}
+    role="region"
+    aria-label="Image Slider"
+  >
+    {#each slides as slide, i}
+      {#if i === currentIndex}
         <div
-          in:fade={{ duration: 1000 }}
-          class="absolute inset-0 transform transition-transform duration-500 group-hover:scale-105"
+          class="absolute inset-0 bg-black"
+          transition:fade={{ duration: 800 }}
         >
           <img
-            src={image}
-            alt="Slide {index + 1}"
-            loading={index === 0 ? 'eager' : 'lazy'}
-            class="w-full h-full object-cover transition-all duration-500"
-            on:error={(e) => {
-              console.error(`Failed to load image: ${image}`);
-              (e.target as HTMLImageElement).src = '/images/fallback.jpg';
-            }}
+            src={isMobile ? slide.image_mobile : slide.image}
+            alt={slide.title || ''}
+            class="absolute inset-0 w-full h-full object-cover opacity-80"
           />
-          <!-- Gradient Overlay -->
-          <div class="absolute inset-0 bg-gradient-to-t from-[#1a1a1a] via-transparent to-transparent opacity-50" />
+
+          <div class="absolute inset-0 flex items-center justify-center z-10">
+            <div class="max-w-lg mx-auto px-4 text-center">
+              {#if slide.title}
+                <h2 
+                  class="text-3xl md:text-4xl font-bold text-white mb-4" 
+                  transition:fly={{ y: 20, duration: 800, easing: quintOut }}
+                >
+                  {slide.title}
+                </h2>
+              {/if}
+
+              {#if slide.description}
+                <p 
+                  class="text-lg text-gray-200 mb-8" 
+                  transition:fly={{ y: 20, duration: 800, delay: 200, easing: quintOut }}
+                >
+                  {slide.description}
+                </p>
+              {/if}
+
+              {#if slide.button_link}
+                <a
+                  href={slide.button_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-block bg-[#e62020] text-white px-8 py-3 rounded-lg font-medium hover:bg-[#ff0000] transition-all duration-300 transform hover:-translate-y-0.5 z-20"
+                  transition:fly={{ y: 20, duration: 800, delay: 400, easing: quintOut }}
+                >
+                  {slide.button_text || 'Selengkapnya'}
+                </a>
+              {/if}
+            </div>
+          </div>
         </div>
       {/if}
     {/each}
 
-    <!-- Navigation Dots -->
-    <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
-      {#each images as _, index}
+    <!-- Navigation -->
+    <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-2 z-20">
+      {#each slides as _, i}
         <button
-          on:click={() => currentIndex = index}
-          class="relative h-1 w-8 rounded-full overflow-hidden transition-all duration-300 {
-            index === currentIndex 
-              ? 'bg-[#e62020]/20' 
-              : 'bg-white/10 hover:bg-white/20'
-          }"
+          class="w-16 h-1 rounded-full overflow-hidden bg-white/20"
+          aria-label="Go to slide {i + 1}"
+          on:click={() => currentIndex = i}
         >
           <div 
-            class="absolute inset-0 bg-[#e62020] rounded-full transition-all duration-500 origin-left {
-              index === currentIndex 
-                ? 'scale-x-100' 
-                : 'scale-x-0'
+            class="h-full bg-[#e62020] rounded-full transition-transform duration-500 origin-left {
+              i === currentIndex ? 'scale-x-100' : 'scale-x-0'
             }"
           />
         </button>
       {/each}
     </div>
 
-    <!-- Navigation Arrows -->
-    <div class="absolute inset-0 flex items-center justify-between px-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+    <!-- Arrows -->
+    <div class="absolute inset-0 flex items-center justify-between px-4 z-20">
       <button
-        on:click={() => currentIndex = (currentIndex - 1 + images.length) % images.length}
-        class="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center border border-white/10 transition-all duration-300 hover:bg-[#e62020]/80 hover:border-[#e62020]/50 hover:scale-110"
+        class="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center border border-white/10 transition-all duration-300 hover:bg-[#e62020]/80 hover:border-[#e62020]/50 hover:scale-110 opacity-0 group-hover:opacity-100"
+        aria-label="Previous slide"
+        on:click={() => currentIndex = (currentIndex - 1 + slides.length) % slides.length}
       >
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
+
       <button
-        on:click={() => currentIndex = (currentIndex + 1) % images.length}
-        class="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center border border-white/10 transition-all duration-300 hover:bg-[#e62020]/80 hover:border-[#e62020]/50 hover:scale-110"
+        class="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center border border-white/10 transition-all duration-300 hover:bg-[#e62020]/80 hover:border-[#e62020]/50 hover:scale-110 opacity-0 group-hover:opacity-100"
+        aria-label="Next slide"
+        on:click={() => currentIndex = (currentIndex + 1) % slides.length}
       >
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -137,7 +194,6 @@
 {/if}
 
 <style>
-  /* Animasi untuk progress bar */
   @keyframes progress {
     from { transform: scaleX(0); }
     to { transform: scaleX(1); }
@@ -145,10 +201,5 @@
   
   .scale-x-100 {
     animation: progress 3s linear;
-  }
-  
-  /* Hover effect untuk bar */
-  button:hover .scale-x-0 {
-    transform: scaleX(0.3);
   }
 </style> 

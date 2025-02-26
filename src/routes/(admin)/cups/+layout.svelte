@@ -93,10 +93,41 @@
   }
 
   async function handleLogout() {
-    // Hapus cookie dengan mengatur expired date ke masa lalu
-    document.cookie = 'admin_data=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    await goto('/cups/login');
-    await invalidateAll();
+    try {
+      // Hapus cookie admin_data
+      document.cookie = 'admin_data=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+      
+      // Hapus semua cookie yang berkaitan dengan auth
+      const cookies = document.cookie.split(';');
+      cookies.forEach(cookie => {
+        const [name] = cookie.trim().split('=');
+        // Hapus cookie admin
+        if (name === 'admin_data') {
+          document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT`;
+        }
+        // Hapus cookie supabase auth
+        if (name.includes('-auth-token')) {
+          document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT`;
+        }
+      });
+
+      await Swal.fire({
+        title: 'Berhasil!',
+        text: 'Anda telah berhasil logout',
+        icon: 'success',
+        confirmButtonColor: '#e62020'
+      });
+
+      goto('/cups/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      await Swal.fire({
+        title: 'Error!',
+        text: 'Gagal logout',
+        icon: 'error',
+        confirmButtonColor: '#e62020'
+      });
+    }
   }
 
   const menus = [

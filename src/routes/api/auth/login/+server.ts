@@ -5,24 +5,24 @@ export async function POST({ request }) {
   try {
     const { identifier, password } = await request.json();
 
-    // Cek apakah identifier adalah email atau username
+    // Cek apakah input adalah email atau username
     const isEmail = identifier.includes('@');
     
     let loginEmail = identifier;
     if (!isEmail) {
       const { data: userData, error: userError } = await supabaseClient
         .from('users')
-        .select()
+        .select('email')
         .eq('username', identifier.toLowerCase())
         .single();
-      
-      if (userError) {
+
+      if (userError || !userData) {
         return json({ error: 'Username tidak ditemukan' }, { status: 400 });
       }
       loginEmail = userData.email;
     }
 
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
+    const { data: authData, error } = await supabaseClient.auth.signInWithPassword({
       email: loginEmail,
       password
     });
@@ -33,24 +33,20 @@ export async function POST({ request }) {
           type: 'signup',
           email: loginEmail
         });
-        
-        return json(
-          { error: 'Email belum dikonfirmasi. Silakan cek inbox email Anda untuk konfirmasi.' }, 
-          { status: 400 }
-        );
+        return json({ 
+          error: 'Email belum dikonfirmasi. Silakan cek inbox email Anda untuk konfirmasi.' 
+        }, { status: 400 });
       }
-      
-      return json(
-        { error: 'Username/Email atau password salah' }, 
-        { status: 401 }
-      );
+      return json({ error: 'Username/Email atau password salah' }, { status: 401 });
     }
 
-    return json({ user: data.user });
+    // Return session data untuk cookie
+    return json({
+      session: authData.session,
+      user: authData.user
+    });
+
   } catch (err) {
-    return json(
-      { error: 'Terjadi kesalahan, silakan coba lagi' }, 
-      { status: 500 }
-    );
+    return json({ error: 'Terjadi kesalahan server' }, { status: 500 });
   }
 } 

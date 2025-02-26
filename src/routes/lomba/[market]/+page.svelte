@@ -265,7 +265,7 @@
                   </p>
                 </div>
 
-                {#if item.result !== null}
+                {#if item.result !== ""}
                   <div>
                     <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Hasil</p>
                     <p class="text-3xl font-bold text-green-400">{item.result}</p>
@@ -284,7 +284,7 @@
                 class={`
                   mt-6 block w-full transform rounded-lg px-4 py-3 text-center font-semibold 
                   text-white transition-all duration-300 relative overflow-hidden
-                  ${item.result === null && getMarketStatus(market).text === 'BUKA' 
+                  ${item.result === "" && getMarketStatus(market).text === 'BUKA' 
                     ? 'bg-gradient-to-r from-[#e62020] to-[#ff0000] hover:from-[#ff0000] hover:to-[#e62020] before:absolute before:inset-0 before:border-2 before:border-white/20 before:rounded-lg before:animate-pulse-border after:absolute after:inset-0 after:bg-gradient-to-r after:from-white/10 after:to-transparent after:animate-shine after:-translate-x-full hover:after:translate-x-full after:transition-transform after:duration-1000'
                     : 'bg-gradient-to-r from-[#e62020] to-[#ff0000] hover:from-[#ff0000] hover:to-[#e62020]'
                   }
@@ -293,11 +293,11 @@
                 `}
               >
                 <span class="relative z-10 inline-flex items-center gap-2">
-                  {item.result !== null || getMarketStatus(market).text !== 'BUKA' 
+                  {item.result !== "" || getMarketStatus(market).text !== 'BUKA' 
                     ? 'Detail Lomba' 
                     : 'Ikuti Lomba'
                   }
-                  {#if item.result === null && getMarketStatus(market).text === 'BUKA'}
+                  {#if item.result === "" && getMarketStatus(market).text === 'BUKA'}
                     <svg 
                       class="w-4 h-4 animate-bounce-right" 
                       fill="none" 
