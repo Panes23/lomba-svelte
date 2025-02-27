@@ -19,5 +19,18 @@ export default defineConfig({
   worker: {
     format: 'es',
     plugins: () => [sveltekit()]
+  },
+  server: {
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: 5173
+    },
+    watch: {
+      usePolling: true
+    }
+  },
+  optimizeDeps: {
+    exclude: ['@supabase/supabase-js']
   }
 }); 

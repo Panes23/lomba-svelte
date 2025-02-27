@@ -1,21 +1,27 @@
 <script lang="ts">
-  import { writable } from 'svelte/store';
-  import MarketButton from './MarketButton.svelte';
   import { fade, scale } from 'svelte/transition';
   import { onMount } from 'svelte';
   import Skeleton from './Skeleton.svelte';
-  import { goto } from '$app/navigation';
+  import { goto, invalidate } from '$app/navigation';
   import type { Market } from '$lib/types/market';
   
-  let markets: Market[] = [];
+  // Terima data dari parent dengan default value
+  export let data = { markets: [] };
+  
+  // Subscribe ke data dari server dengan pengecekan
+  $: markets = data?.markets || [];
+  
+  let loading = true;
   let searchQuery = '';
   export let limit: number | null = null;
+  export let showSearch = true;
+  export let showViewAll = false;
   
   $: filteredMarkets = markets.filter(market => 
     searchQuery 
       ? market.name.toLowerCase().includes(searchQuery.toLowerCase())
       : true
-  );
+  ).slice(0, limit || undefined);
 
   // Sort filtered markets berdasarkan status dan waktu tutup
   $: sortedAndFilteredMarkets = [...filteredMarkets].sort((a, b) => {
@@ -42,16 +48,11 @@
 
   let showTerms = false;
   let selectedMarket = null;
-  let loading = true;
 
   onMount(async () => {
     try {
-      const response = await fetch('/api/markets');
-      const data = await response.json();
-      
-      if (!response.ok) throw new Error(data.error);
-      
-      markets = data;
+      loading = true;
+      await invalidate('app:markets');
     } catch (err) {
       console.error('Error:', err);
     } finally {
@@ -118,23 +119,35 @@
     
     return (closeHour * 60 + closeMinute) - (currentHour * 60 + currentMinute);
   }
+
+  // Tambahkan fungsi format waktu
+  function formatTime(time: string) {
+    // Jika format waktu sudah HH:MM:SS, ambil hanya HH:MM
+    if (time.includes(':')) {
+      return time.substring(0, 5);
+    }
+    // Jika format waktu HH.MM, ubah ke HH:MM
+    return time.replace('.', ':');
+  }
+
+  // Tambahkan fungsi untuk handle cache busting pada gambar
+  function getImageUrl(url: string) {
+    if (!url) return '';
+    // Tambahkan timestamp sebagai query parameter
+    return `${url}?t=${Date.now()}`;
+  }
 </script>
 
 <div class="space-y-6">
-  <!-- Search bar jika tidak ada limit -->
-  {#if !limit}
-    <div class="max-w-xl mx-auto px-4">
-      <div class="relative">
-        <input
-          type="text"
-          bind:value={searchQuery}
-          placeholder="Cari pasaran..."
-          class="w-full bg-[#1a1a1a] text-white px-4 py-3 pr-10 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
-        />
-        <svg class="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
+  <!-- Search bar - hanya tampilkan jika showSearch true -->
+  {#if showSearch}
+    <div class="flex justify-center">
+      <input
+        type="text"
+        bind:value={searchQuery}
+        placeholder="Cari pasaran..."
+        class="w-1/2 bg-[#222] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
+      />
     </div>
   {/if}
 
@@ -191,7 +204,7 @@
             <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/20 to-transparent rounded-full blur-xl group-hover:blur-2xl transition-all duration-500" />
             <div class="absolute inset-0 border-2 border-[#e62020]/20 rounded-full group-hover:border-[#e62020]/40 transition-all duration-500" />
             <img
-              src={market.image}
+              src={getImageUrl(market.image)}
               alt={market.name}
               class="relative h-20 w-20 rounded-full object-cover shadow-2xl transition-all duration-300"
             />
@@ -215,18 +228,22 @@
             <div class="absolute top-1/2 left-1/2 w-px h-12 bg-gradient-to-b from-transparent via-gray-700/50 to-transparent transform -translate-x-1/2 -translate-y-1/2" />
             <div>
               <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Jam Buka</p>
-              <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.buka}</p>
+              <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">
+                {formatTime(market.buka)}
+              </p>
             </div>
             <div>
               <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Jam Tutup</p>
-              <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.tutup}</p>
+              <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">
+                {formatTime(market.tutup)}
+              </p>
             </div>
           </div>
 
           <!-- Official Link -->
           <div class="mb-4 text-center">
             <a
-              href={market.officialLink}
+              href={market.officiallink}
               target="_blank"
               rel="noopener noreferrer"
               class="w-full group/link inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#e62020]/10 to-[#e62020]/5 border border-[#e62020]/20 hover:border-[#e62020]/40 transition-all duration-300 backdrop-blur-sm hover:shadow-lg hover:shadow-[#e62020]/10 whitespace-nowrap text-xs"
@@ -271,28 +288,15 @@
       {/each}
     </div>
 
-    <!-- Tombol Seluruh Pasaran jika ada limit -->
-    {#if limit && sortedAndFilteredMarkets.length > limit}
+    <!-- View All button - hanya tampilkan jika showViewAll true -->
+    {#if showViewAll}
       <div class="text-center mt-8">
-        <a 
-          href="/lomba"
-          class="inline-flex items-center gap-2 px-6 py-3 bg-[#222] hover:bg-[#333] text-white rounded-lg transition-colors duration-300 group"
+        <button
+          on:click={() => goto('/lomba')}
+          class="px-6 py-2 bg-[#e62020] text-white rounded-lg hover:bg-opacity-90 transition-colors"
         >
-          <span>Lihat Seluruh Pasaran</span>
-          <svg 
-            class="w-4 h-4 transform transition-transform group-hover:translate-x-1" 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path 
-              stroke-linecap="round" 
-              stroke-linejoin="round" 
-              stroke-width="2" 
-              d="M13 7l5 5m0 0l-5 5m5-5H6"
-            />
-          </svg>
-        </a>
+          Lihat Seluruh Pasaran
+        </button>
       </div>
     {/if}
   {/if}
@@ -361,5 +365,12 @@
         </div>
       </div>
     </div>
+  </div>
+{/if}
+
+<!-- Tambahkan debug info -->
+{#if !markets.length && !loading}
+  <div class="text-center text-gray-400 py-8">
+    Tidak ada data pasaran tersedia
   </div>
 {/if} 

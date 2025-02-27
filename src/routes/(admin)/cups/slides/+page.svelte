@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { supabaseClient } from '$lib/supabaseClient';
   import Swal from '$lib/utils/swal';
   import { dndzone } from 'svelte-dnd-action';
   import { slidesStore } from '$lib/stores/slidesStore';
@@ -32,89 +31,8 @@
   let editDesktopImagePreview = '';
   let editMobileImagePreview = '';
 
-  // Bunny.net config
-  const REGION = 'sg';
-  const BASE_HOSTNAME = 'storage.bunnycdn.com';
-  const HOSTNAME = `${REGION}.${BASE_HOSTNAME}`;
-  const STORAGE_ZONE_NAME = 'tebakangka';
-  const ACCESS_KEY = '54156f62-6023-4352-a499b292e0b8-d9b2-49c5';
-
-  // Fungsi untuk mendapatkan path file dari URL
-  function getPathFromUrl(url: string) {
-    const cdnUrl = `https://${STORAGE_ZONE_NAME}.b-cdn.net/`;
-    try {
-      // Contoh URL: https://tebakangka.b-cdn.net/slides/1234567890-image.jpg
-      const urlObj = new URL(url);
-      // Ambil path setelah hostname: /slides/1234567890-image.jpg
-      const path = urlObj.pathname;
-      // Hapus forward slash di awal
-      return path.substring(1);
-    } catch (err) {
-      console.error('Error parsing URL:', err);
-      return '';
-    }
-  }
-
-  // Fungsi untuk menghapus file dari Bunny.net
-  async function deleteFromBunny(url: string) {
-    try {
-      const filePath = getPathFromUrl(url);
-      if (!filePath) {
-        throw new Error('Invalid file path');
-      }
-
-      const deleteUrl = `https://${HOSTNAME}/${STORAGE_ZONE_NAME}/${filePath}`;
-      console.log('Deleting file:', deleteUrl);
-      
-      const response = await fetch(deleteUrl, {
-        method: 'DELETE',
-        headers: {
-          'AccessKey': ACCESS_KEY
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Delete failed with status: ${response.status}`);
-      }
-
-      console.log('File deleted successfully:', filePath);
-    } catch (error) {
-      console.error('Delete error:', error);
-      throw error;
-    }
-  }
-
-  async function uploadToBunny(file: File) {
-    try {
-      const fileName = `slides/${Date.now()}-${file.name}`;
-      const url = `https://${HOSTNAME}/${STORAGE_ZONE_NAME}/${fileName}`;
-      
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'AccessKey': ACCESS_KEY,
-          'Content-Type': 'application/octet-stream'
-        },
-        body: file
-      });
-
-      if (!response.ok) throw new Error('Upload failed');
-      
-      // Return CDN URL
-      return `https://${STORAGE_ZONE_NAME}.b-cdn.net/${fileName}`;
-    } catch (error) {
-      console.error('Upload error:', error);
-      throw error;
-    }
-  }
-
   export let data;
-  $: slides = data.slides.sort((a, b) => {
-    // Handle null/undefined positions
-    const posA = a.position ?? Number.MAX_SAFE_INTEGER;
-    const posB = b.position ?? Number.MAX_SAFE_INTEGER;
-    return posA - posB;
-  });
+  $: slides = data.slides;
   let oldSlides: typeof slides = [];
 
   // Filter slides
@@ -141,20 +59,19 @@
         updated_at: new Date().toISOString()
       }));
 
-      // Update database
-      const { error } = await supabaseClient.from('slides').upsert(updates);
-      
-      // Update local state & store langsung
-      slides = [...updates];
-      slidesStore.updateSlides(updates);
+      // Update melalui API endpoint
+      const response = await fetch('/api/slides', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides: updates })
+      });
+
+      if (!response.ok) throw new Error('Failed to update positions');
+
+      // Refresh data
+      await slidesStore.fetch();
     } catch (err) {
       console.error('Error updating positions:', err);
-      await Swal.fire({
-        title: 'Error!',
-        text: 'Gagal mengupdate posisi slides',
-        icon: 'error',
-        confirmButtonColor: '#e62020'
-      });
       // Revert changes on error
       slides = [...oldSlides];
     } finally {
@@ -162,12 +79,27 @@
     }
   }
 
+  async function uploadFile(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('path', 'slides');
+    
+    const response = await fetch('/api/bunny/upload', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) throw new Error('Failed to upload image');
+    const data = await response.json();
+    return data.url;
+  }
+
   async function handleAddSlide() {
     try {
       loading = true;
       
       // Get max position
-      const maxPosition = Math.max(...slides.map(s => s.position), -1) + 1;
+      const maxPosition = Math.max(...slides.map(s => s.position ?? 0), -1) + 1;
 
       // Get file inputs
       const fileInput = document.querySelector<HTMLInputElement>('#slideImage');
@@ -179,13 +111,14 @@
         throw new Error('Please select both desktop and mobile images');
       }
 
-      // Upload to Bunny.net
-      const imageUrl = await uploadToBunny(file);
-      const imageMobileUrl = await uploadToBunny(fileMobile);
+      // Upload ke Bunny.net dengan path 'slides'
+      const imageUrl = await uploadFile(file);
+      const imageMobileUrl = await uploadFile(fileMobile);
 
-      const { data, error } = await supabaseClient
-        .from('slides')
-        .insert({
+      const response = await fetch('/api/slides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           title: newSlide.title,
           description: newSlide.description,
           image: imageUrl,
@@ -195,13 +128,26 @@
           position: maxPosition,
           created_at: new Date().toISOString()
         })
-        .select()
-        .single();
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to add slide');
+      }
 
-      // Update state lokal
-      slides = [data, ...slides];
+      const { data } = await response.json();
+      
+      // Update local state
+      slides = [...slides, {
+        id: data.id,
+        title: newSlide.title,
+        description: newSlide.description,
+        image: imageUrl,
+        image_mobile: imageMobileUrl,
+        button_text: newSlide.button_text,
+        button_link: newSlide.button_link,
+        position: maxPosition,
+        created_at: new Date().toISOString()
+      }];
       // Trigger reactive update
       slides = slides;
       filteredSlides = filteredSlides;
@@ -252,46 +198,51 @@
       const fileMobile = fileMobileInput?.files?.[0];
       
       if (file) {
-        // Upload new image
-        const newImageUrl = await uploadToBunny(file);
-        // Hapus file lama setelah upload berhasil
-        if (imageUrl) {
-          await deleteFromBunny(imageUrl);
+        // Gunakan fungsi uploadFile alih-alih implementasi langsung
+        imageUrl = await uploadFile(file);
+        
+        // Delete old file
+        if (editingSlide.image) {
+          await fetch('/api/bunny/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: editingSlide.image })
+          });
         }
-        imageUrl = newImageUrl;
       }
       
       if (fileMobile) {
-        // Upload new mobile image
-        const newMobileImageUrl = await uploadToBunny(fileMobile);
-        // Hapus file mobile lama setelah upload berhasil
-        if (imageMobileUrl) {
-          await deleteFromBunny(imageMobileUrl);
+        // Gunakan fungsi uploadFile untuk mobile image juga
+        imageMobileUrl = await uploadFile(fileMobile);
+        
+        // Delete old file
+        if (editingSlide.image_mobile) {
+          await fetch('/api/bunny/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: editingSlide.image_mobile })
+          });
         }
-        imageMobileUrl = newMobileImageUrl;
       }
 
-      const { error } = await supabaseClient
-        .from('slides')
-        .update({
-          title: editingSlide.title === '' ? null : editingSlide.title,
-          description: editingSlide.description === '' ? null : editingSlide.description,
+      const response = await fetch(`/api/slides/${editingSlide.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editingSlide,
           image: imageUrl,
           image_mobile: imageMobileUrl,
-          button_text: editingSlide.button_text === '' ? null : editingSlide.button_text,
-          button_link: editingSlide.button_link === '' ? null : editingSlide.button_link,
           updated_at: new Date().toISOString()
         })
-        .eq('id', editingSlide.id);
+      });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to update slide');
+      const { data } = await response.json();
 
-      // Update state lokal
-      slides = slides.map(slide => 
-        slide.id === editingSlide.id 
-          ? { ...editingSlide }
-          : slide
-      );
+      // Update local state dan urutkan berdasarkan updated_at terbaru
+      slides = slides
+        .map(slide => slide.id === editingSlide.id ? data : slide)
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
       // Refresh slides data
       await slidesStore.fetch();
@@ -300,7 +251,8 @@
         title: 'Berhasil!',
         text: 'Slide berhasil diupdate',
         icon: 'success',
-        confirmButtonColor: '#e62020'
+        timer: 1500,
+        showConfirmButton: false
       });
 
       showEditModal = false;
@@ -321,43 +273,39 @@
   async function handleDelete(slide) {
     try {
       const result = await Swal.fire({
-        title: 'Konfirmasi',
-        text: 'Apakah Anda yakin ingin menghapus slide ini?',
+        title: 'Hapus Slide?',
+        text: 'Slide yang dihapus tidak dapat dikembalikan',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#e62020',
-        cancelButtonColor: '#3f3f46',
+        cancelButtonColor: '#3f3f3f',
         confirmButtonText: 'Ya, Hapus!',
         cancelButtonText: 'Batal'
       });
 
       if (result.isConfirmed) {
         loading = true;
+        oldSlides = [...slides];
 
-        // Hapus file dari Bunny.net
-        try {
-          if (slide.image) {
-            await deleteFromBunny(slide.image);
-          }
-          if (slide.image_mobile) {
-            await deleteFromBunny(slide.image_mobile);
-          }
-        } catch (err) {
-          console.error('Failed to delete files from Bunny.net:', err);
-          // Lanjutkan proses meski file gagal dihapus
+        const response = await fetch('/api/slides', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: slide.id,
+            imageUrl: slide.image,
+            imageMobileUrl: slide.image_mobile
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to delete slide');
         }
 
-        const { error } = await supabaseClient
-          .from('slides')
-          .delete()
-          .eq('id', slide.id);
-
-        if (error) throw error;
-
-        // Update state lokal
+        // Update local state
         slides = slides.filter(s => s.id !== slide.id);
-        // Refresh slides store
-        await slidesStore.fetch();
+        // Trigger reactive update
+        slides = slides;
+        filteredSlides = filteredSlides;
 
         await Swal.fire({
           title: 'Berhasil!',
@@ -368,9 +316,10 @@
       }
     } catch (error) {
       console.error('Error:', error);
+      slides = [...oldSlides];
       await Swal.fire({
         title: 'Error!',
-        text: error.message || 'Gagal menghapus slide. File mungkin sudah terhapus.',
+        text: error.message || 'Gagal menghapus slide',
         icon: 'error',
         confirmButtonColor: '#e62020'
       });
@@ -477,7 +426,7 @@
         </thead>
         <tbody 
           class="divide-y divide-gray-800"
-          use:dndzone={{items: filteredSlides}}
+          use:dndzone={{items: filteredSlides, dragDisabled: loading}}
           on:consider={handleDndConsider}
           on:finalize={handleDndFinalize}
         >
@@ -498,7 +447,10 @@
                 data-id={item.id}
               >
                 <td class="px-4 py-3">
-                  <div class="flex items-center justify-center w-6 h-6 bg-gray-800 rounded">
+                  <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+                    </svg>
                     <span class="text-sm text-gray-400">{item.position ?? 0}</span>
                   </div>
                 </td>
@@ -571,285 +523,193 @@
     </div>
   </div>
 
-  <!-- Modal Add Slide -->
-  {#if showModal}
+  <!-- Modal Add/Edit Slide -->
+  {#if showModal || showEditModal}
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-[#222] rounded-xl border border-gray-800 p-6 w-full max-w-3xl mx-4">
-        <div class="flex justify-between items-center mb-6">
-          <h3 class="text-xl font-bold text-white">Add New Slide</h3>
+      <div class="bg-[#222] rounded-xl border border-gray-800 p-8 w-full max-w-5xl mx-4">
+        <div class="flex justify-between items-center mb-8">
+          <h3 class="text-2xl font-bold text-white">
+            {showModal ? 'Add New Slide' : 'Edit Slide'}
+          </h3>
           <button 
-            on:click={() => showModal = false}
-            class="text-gray-400 hover:text-white"
+            on:click={() => showModal ? (showModal = false) : (showEditModal = false)}
+            class="text-gray-400 hover:text-white transition-colors"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <form on:submit|preventDefault={handleAddSlide} class="flex gap-6">
-          <!-- Form Fields -->
-          <div class="flex-1 space-y-4">
-            <h4 class="text-sm font-medium text-gray-400 uppercase tracking-wider">Informasi Slide</h4>
-            <div>
-              <label class="block text-sm font-medium text-gray-400 mb-2">Title</label>
-              <input
-                type="text"
-                bind:value={newSlide.title}
-                placeholder="Masukkan judul slide"
-                class="w-full bg-[#2a2a2a] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
-              />
-            </div>
+        <form on:submit|preventDefault={showModal ? handleAddSlide : handleUpdate}>
+          <div class="flex gap-8">
+            <!-- Form Fields -->
+            <div class="flex-1 space-y-6">
+              <div class="p-6 bg-[#1a1a1a] rounded-xl border border-gray-800 h-full">
+                <h4 class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-6">Informasi Slide</h4>
+                <div class="space-y-6">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Title</label>
+                    {#if showModal}
+                      <input
+                        type="text"
+                        bind:value={newSlide.title}
+                        placeholder="Masukkan judul slide"
+                        class="w-full bg-[#222] text-white px-4 py-3 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020] focus:ring-2 focus:ring-[#e62020]/20 transition-all"
+                      />
+                    {:else}
+                      <input
+                        type="text"
+                        bind:value={editingSlide.title}
+                        placeholder="Masukkan judul slide"
+                        class="w-full bg-[#222] text-white px-4 py-3 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020] focus:ring-2 focus:ring-[#e62020]/20 transition-all"
+                      />
+                    {/if}
+                  </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-400 mb-2">Description</label>
-              <textarea
-                bind:value={newSlide.description}
-                rows="3"
-                placeholder="Masukkan deskripsi slide"
-                class="w-full bg-[#2a2a2a] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
-              ></textarea>
-            </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Description</label>
+                    {#if showModal}
+                      <textarea
+                        bind:value={newSlide.description}
+                        rows="5"
+                        placeholder="Masukkan deskripsi slide"
+                        class="w-full bg-[#222] text-white px-4 py-3 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020] focus:ring-2 focus:ring-[#e62020]/20 transition-all resize-none"
+                      ></textarea>
+                    {:else}
+                      <textarea
+                        bind:value={editingSlide.description}
+                        rows="4"
+                        placeholder="Masukkan deskripsi slide"
+                        class="w-full bg-[#222] text-white px-4 py-3 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020] focus:ring-2 focus:ring-[#e62020]/20 transition-all resize-none"
+                      ></textarea>
+                    {/if}
+                  </div>
 
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-400 mb-2">Button Text</label>
-                <input
-                  type="text"
-                  bind:value={newSlide.button_text}
-                  placeholder="Masukkan teks tombol"
-                  class="w-full bg-[#2a2a2a] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
-                />
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-400 mb-2">Button Text</label>
+                      {#if showModal}
+                        <input
+                          type="text"
+                          bind:value={newSlide.button_text}
+                          placeholder="Masukkan teks tombol"
+                          class="w-full bg-[#222] text-white px-4 py-3 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020] focus:ring-2 focus:ring-[#e62020]/20 transition-all"
+                        />
+                      {:else}
+                        <input
+                          type="text"
+                          bind:value={editingSlide.button_text}
+                          placeholder="Masukkan teks tombol"
+                          class="w-full bg-[#222] text-white px-4 py-3 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020] focus:ring-2 focus:ring-[#e62020]/20 transition-all"
+                        />
+                      {/if}
+                    </div>
+
+                    <div>
+                      <label class="block text-sm font-medium text-gray-400 mb-2">Button Link</label>
+                      {#if showModal}
+                        <input
+                          type="text"
+                          bind:value={newSlide.button_link}
+                          placeholder="Masukkan link tombol"
+                          class="w-full bg-[#222] text-white px-4 py-3 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020] focus:ring-2 focus:ring-[#e62020]/20 transition-all"
+                        />
+                      {:else}
+                        <input
+                          type="text"
+                          bind:value={editingSlide.button_link}
+                          placeholder="Masukkan link tombol"
+                          class="w-full bg-[#222] text-white px-4 py-3 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020] focus:ring-2 focus:ring-[#e62020]/20 transition-all"
+                        />
+                      {/if}
+                    </div>
+                  </div>
+                </div>
               </div>
+            </div>
 
-              <div>
-                <label class="block text-sm font-medium text-gray-400 mb-2">Button Link</label>
-                <input
-                  type="text"
-                  bind:value={newSlide.button_link}
-                  placeholder="Masukkan link tombol"
-                  class="w-full bg-[#2a2a2a] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
-                />
+            <!-- Image Upload -->
+            <div class="w-96 space-y-6 h-full">
+              <div class="p-6 bg-[#1a1a1a] rounded-xl border border-gray-800 h-full">
+                <h4 class="text-sm font-medium text-gray-400 uppercase tracking-wider mb-6">Upload Gambar</h4>
+                <div class="space-y-8">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">
+                      Desktop Image 
+                      <span class="text-xs text-gray-500 ml-1">(1250x505 pixel)</span>
+                    </label>
+                    <div class="relative border-2 border-dashed border-gray-700 rounded-xl p-6 text-center hover:border-[#e62020] hover:bg-[#e62020]/5 transition-all group cursor-pointer">
+                      <input
+                        type="file"
+                        id={showModal ? "slideImage" : "editSlideImage"}
+                        accept="image/*"
+                        required={showModal}
+                        on:change={showModal ? handleDesktopImagePreview : handleEditDesktopImagePreview}
+                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      {#if (showModal ? desktopImagePreview : editDesktopImagePreview) || (!showModal && editingSlide.image)}
+                        <img 
+                          src={showModal ? desktopImagePreview : (editDesktopImagePreview || editingSlide.image)}
+                          alt="Preview"
+                          class="w-full h-40 object-cover rounded-lg shadow-lg"
+                        />
+                      {:else}
+                        <div class="text-gray-400 group-hover:text-[#e62020] transition-colors">
+                          <svg class="w-12 h-12 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span class="text-sm font-medium">Klik untuk upload gambar desktop</span>
+                          <p class="text-xs text-gray-500 mt-1">atau drag & drop file di sini</p>
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">
+                      Mobile Image
+                      <span class="text-xs text-gray-500 ml-1">(360x400 pixel)</span>
+                    </label>
+                    <div class="relative border-2 border-dashed border-gray-700 rounded-xl p-6 text-center hover:border-[#e62020] hover:bg-[#e62020]/5 transition-all group cursor-pointer">
+                      <input
+                        type="file"
+                        id={showModal ? "slideMobileImage" : "editSlideMobileImage"}
+                        accept="image/*"
+                        required={showModal}
+                        on:change={showModal ? handleMobileImagePreview : handleEditMobileImagePreview}
+                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      {#if (showModal ? mobileImagePreview : editMobileImagePreview) || (!showModal && editingSlide.image_mobile)}
+                        <img 
+                          src={showModal ? mobileImagePreview : (editMobileImagePreview || editingSlide.image_mobile)}
+                          alt="Preview"
+                          class="w-full h-40 object-cover rounded-lg shadow-lg"
+                        />
+                      {:else}
+                        <div class="text-gray-400 group-hover:text-[#e62020] transition-colors">
+                          <svg class="w-12 h-12 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span class="text-sm font-medium">Klik untuk upload gambar mobile</span>
+                          <p class="text-xs text-gray-500 mt-1">atau drag & drop file di sini</p>
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Image Upload -->
-          <div class="w-72 space-y-6">
-            <h4 class="text-sm font-medium text-gray-400 uppercase tracking-wider">Upload Gambar</h4>
-            
-            <div class="space-y-4">
-              <label class="block text-sm font-medium text-gray-400">
-                Desktop Image 
-                <span class="text-xs text-gray-500 block mt-1">(Rekomendasi: 1250x505 pixel)</span>
-              </label>
-              <div class="relative border-2 border-dashed border-gray-700 rounded-lg p-4 text-center hover:border-[#e62020] transition-colors">
-                <input
-                  type="file"
-                  id="slideImage"
-                  accept="image/*"
-                  required
-                  on:change={handleDesktopImagePreview}
-                  class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                {#if desktopImagePreview}
-                  <img 
-                    src={desktopImagePreview} 
-                    alt="Preview"
-                    class="w-full h-32 object-cover rounded-lg"
-                  />
-                {:else}
-                  <div class="text-gray-400">
-                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span class="text-sm">Klik untuk upload</span>
-                  </div>
-                {/if}
-              </div>
-            </div>
-
-            <div class="space-y-4">
-              <label class="block text-sm font-medium text-gray-400">
-                Mobile Image
-                <span class="text-xs text-gray-500 block mt-1">(Rekomendasi: 360x400 pixel)</span>
-              </label>
-              <div class="relative border-2 border-dashed border-gray-700 rounded-lg p-4 text-center hover:border-[#e62020] transition-colors">
-                <input
-                  type="file"
-                  id="slideMobileImage"
-                  accept="image/*"
-                  required
-                  on:change={handleMobileImagePreview}
-                  class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                {#if mobileImagePreview}
-                  <img 
-                    src={mobileImagePreview} 
-                    alt="Preview"
-                    class="w-24 h-32 object-cover rounded-lg mx-auto"
-                  />
-                {:else}
-                  <div class="text-gray-400">
-                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span class="text-sm">Klik untuk upload</span>
-                  </div>
-                {/if}
-              </div>
-            </div>
-
-            <!-- Submit Button -->
-            <button
-              type="submit"
-              disabled={loading}
-              class="w-full bg-[#e62020] text-white py-2 rounded-lg font-medium hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-4"
-            >
-              {loading ? 'Loading...' : 'Add Slide'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  {/if}
-
-  <!-- Modal Edit Slide -->
-  {#if showEditModal}
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-[#222] rounded-xl border border-gray-800 p-6 w-full max-w-3xl mx-4">
-        <div class="flex justify-between items-center mb-6">
-          <h3 class="text-xl font-bold text-white">Edit Slide</h3>
-          <button 
-            on:click={() => showEditModal = false}
-            class="text-gray-400 hover:text-white"
+          <!-- Submit Button -->
+          <button
+            type="submit"
+            disabled={loading}
+            class="w-full bg-gradient-to-r from-[#e62020] to-[#ff0000] text-white py-3 rounded-xl font-medium hover:from-[#ff0000] hover:to-[#e62020] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-6 shadow-lg shadow-[#e62020]/20"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            {loading ? 'Loading...' : showModal ? 'Add Slide' : 'Update Slide'}
           </button>
-        </div>
-
-        <form on:submit|preventDefault={handleUpdate} class="flex gap-6">
-          <!-- Form Fields -->
-          <div class="flex-1 space-y-4">
-            <h4 class="text-sm font-medium text-gray-400 uppercase tracking-wider">Informasi Slide</h4>
-            <div>
-              <label class="block text-sm font-medium text-gray-400 mb-2">Title</label>
-              <input
-                type="text"
-                bind:value={editingSlide.title}
-                placeholder="Masukkan judul slide"
-                class="w-full bg-[#2a2a2a] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-400 mb-2">Description</label>
-              <textarea
-                bind:value={editingSlide.description}
-                rows="3"
-                placeholder="Masukkan deskripsi slide"
-                class="w-full bg-[#2a2a2a] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
-              ></textarea>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-400 mb-2">Button Text</label>
-                <input
-                  type="text"
-                  bind:value={editingSlide.button_text}
-                  placeholder="Masukkan teks tombol"
-                  class="w-full bg-[#2a2a2a] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
-                />
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-400 mb-2">Button Link</label>
-                <input
-                  type="text"
-                  bind:value={editingSlide.button_link}
-                  placeholder="Masukkan link tombol"
-                  class="w-full bg-[#2a2a2a] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Image Upload -->
-          <div class="w-72 space-y-6">
-            <h4 class="text-sm font-medium text-gray-400 uppercase tracking-wider">Upload Gambar</h4>
-            
-            <div class="space-y-4">
-              <label class="block text-sm font-medium text-gray-400">
-                Desktop Image 
-                <span class="text-xs text-gray-500 block mt-1">(Rekomendasi: 1250x505 pixel)</span>
-              </label>
-              <div class="relative border-2 border-dashed border-gray-700 rounded-lg p-4 text-center hover:border-[#e62020] transition-colors">
-                <input
-                  type="file"
-                  id="editSlideImage"
-                  accept="image/*"
-                  on:change={handleEditDesktopImagePreview}
-                  class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                {#if editDesktopImagePreview || editingSlide.image}
-                  <img 
-                    src={editDesktopImagePreview || editingSlide.image} 
-                    alt="Preview"
-                    class="w-full h-32 object-cover rounded-lg"
-                  />
-                {:else}
-                  <div class="text-gray-400">
-                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span class="text-sm">Klik untuk upload</span>
-                  </div>
-                {/if}
-              </div>
-            </div>
-
-            <div class="space-y-4">
-              <label class="block text-sm font-medium text-gray-400">
-                Mobile Image
-                <span class="text-xs text-gray-500 block mt-1">(Rekomendasi: 360x400 pixel)</span>
-              </label>
-              <div class="relative border-2 border-dashed border-gray-700 rounded-lg p-4 text-center hover:border-[#e62020] transition-colors">
-                <input
-                  type="file"
-                  id="editSlideMobileImage"
-                  accept="image/*"
-                  on:change={handleEditMobileImagePreview}
-                  class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                {#if editMobileImagePreview || editingSlide.image_mobile}
-                  <img 
-                    src={editMobileImagePreview || editingSlide.image_mobile} 
-                    alt="Preview"
-                    class="w-24 h-32 object-cover rounded-lg mx-auto"
-                  />
-                {:else}
-                  <div class="text-gray-400">
-                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span class="text-sm">Klik untuk upload</span>
-                  </div>
-                {/if}
-              </div>
-            </div>
-
-            <!-- Submit Button -->
-            <button
-              type="submit"
-              disabled={loading}
-              class="w-full bg-[#e62020] text-white py-2 rounded-lg font-medium hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-4"
-            >
-              {loading ? 'Loading...' : 'Update Slide'}
-            </button>
-          </div>
         </form>
       </div>
     </div>

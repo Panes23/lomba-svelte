@@ -6,6 +6,10 @@
   let loading = false;
   let searchQuery = '';
   let currentPage = 1;
+  let oldUsers: any[] = [];
+  let users: any[] = [];
+  let privilages: any[] = [];
+  
   const itemsPerPage = 8;
   let showModal = false;
   let showEditModal = false;
@@ -23,62 +27,18 @@
   };
 
   export let data;
-  let users = [];
-  let oldUsers: typeof users = [];
-  $: privilages = data.privilages;
-
-  onMount(async () => {
-    loading = true;
-    try {
-      const { data: userData, error } = await supabaseClient
-        .from('coretax')
-        .select(`
-          id,
-          username,
-          email,
-          level,
-          level_id,
-          created_at,
-          updated_at
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      users = userData || [];
-      users = [...users];
-    } catch (error) {
-      console.error('Error loading users:', error);
-      await Swal.fire({
-        title: 'Error!',
-        text: 'Gagal memuat data users',
-        icon: 'error',
-        confirmButtonColor: '#e62020'
-      });
-    } finally {
-      loading = false;
-    }
-  });
+  $: {
+    users = data.coretax || [];
+    privilages = data.privilages || [];
+  }
 
   // Refresh data function
   async function refreshData() {
     try {
       loading = true;
-      const { data: refreshedData, error } = await supabaseClient
-        .from('coretax')
-        .select(`
-          id,
-          username,
-          email,
-          level,
-          level_id,
-          created_at,
-          updated_at
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      users = refreshedData || [];
-      users = [...users];
+      const response = await fetch('/api/xcoretax');
+      const refreshedData = await response.json();
+      users = refreshedData;
     } catch (error) {
       console.error('Error refreshing data:', error);
       await Swal.fire({
@@ -316,11 +276,11 @@
           {:else}
             {#each paginatedUsers as user}
               <tr class="text-gray-300 hover:bg-[#2a2a2a] transition-colors">
-                <td class="px-4 py-3">{user.username || '-'}</td>
-                <td class="px-4 py-3">{user.email || '-'}</td>
-                <td class="px-4 py-3">{user.level || '-'}</td>
-                <td class="px-4 py-3">{formatDate(user.created_at)}</td>
-                <td class="px-4 py-3">{formatDate(user.updated_at)}</td>
+                <td class="px-4 py-3">{user?.username || '-'}</td>
+                <td class="px-4 py-3">{user?.email || '-'}</td>
+                <td class="px-4 py-3">{user?.level || '-'}</td>
+                <td class="px-4 py-3">{formatDate(user?.created_at)}</td>
+                <td class="px-4 py-3">{formatDate(user?.updated_at)}</td>
               </tr>
             {/each}
           {/if}

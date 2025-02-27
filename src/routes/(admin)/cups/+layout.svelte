@@ -19,6 +19,7 @@
 
   // Fungsi untuk cek auth
   async function checkAuth() {
+    // Skip auth check untuk halaman login
     if ($page.url.pathname === '/cups/login') {
       loading = false;
       return;
@@ -38,30 +39,13 @@
       userLevel = adminData.level;
 
       // Ambil akses dari tabel privilage berdasarkan level
-      const { data: privilageData, error: privilageError } = await supabaseClient
-        .from('privilage')
-        .select('akses')
-        .eq('level', userLevel)
-        .single();
-
-      if (privilageError) throw privilageError;
-      
-      // Cek akses untuk current path
-      const currentPath = $page.url.pathname;
-      const requiredAccess = getRequiredAccessForPath(currentPath);
-      
-      if (requiredAccess && (!privilageData?.akses || !privilageData.akses.includes(requiredAccess))) {
-        await Swal.fire({
-          title: 'Akses Ditolak!',
-          text: 'Anda tidak memiliki akses ke halaman ini',
-          icon: 'error',
-          confirmButtonColor: '#e62020'
-        });
-        goto('/cups');
-        return;
+      const response = await fetch(`/api/privilage?level=${userLevel}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch privileges');
       }
+      const privilageData = await response.json();
 
-      if (privilageData) {
+      if (privilageData?.akses) {
         userAccess = privilageData.akses;
       }
 
@@ -69,7 +53,10 @@
       userData = adminData;
     } catch (error) {
       console.error('Auth error:', error);
-      goto('/cups/login');
+      // Redirect ke login hanya jika bukan di halaman login
+      if ($page.url.pathname !== '/cups/login') {
+        goto('/cups/login');
+      }
     } finally {
       loading = false;
     }
@@ -80,6 +67,7 @@
     const pathAccessMap = {
       '/cups/users': 'list users',
       '/cups/lomba': 'list lomba',
+      '/cups/fake-users': 'fake users',
       '/cups/markets': 'pasaran lomba',
       '/cups/websites': 'websites',
       '/cups/slides': 'slides',
@@ -156,6 +144,12 @@
           path: '/cups/lomba',
           icon: 'M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 002.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 012.916.52 6.003 6.003 0 01-5.395 4.972m0 0a6.726 6.726 0 01-2.749 1.35m0 0a6.772 6.772 0 01-3.044 0',
           access: ['list lomba']
+        },
+        {
+          name: 'Fake Users',
+          path: '/cups/fake-users',
+          icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+          access: ['fake users']
         }
       ]
     },
@@ -223,6 +217,10 @@
       item.access.some(access => userAccess.includes(access))
     )
   })).filter(group => group.items.length > 0);
+
+  onMount(() => {
+    checkAuth();
+  });
 </script>
 
 {#if $page.url.pathname === '/cups/login' || isAuthenticated}

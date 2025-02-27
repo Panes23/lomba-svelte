@@ -6,15 +6,15 @@ export const load: PageServerLoad = async () => {
     const { data: markets, error } = await supabaseClient
       .from('markets')
       .select('*')
-      .order('id');
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
 
     return {
       markets: markets || []
     };
-  } catch (err) {
-    console.error('Error loading markets:', err);
+  } catch (error) {
+    console.error('Error:', error);
     return {
       markets: []
     };

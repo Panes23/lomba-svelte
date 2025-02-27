@@ -4,6 +4,6 @@ export interface Market {
   buka: string;
   tutup: string;
   image: string;
-  officialLink: string;
+  officiallink: string;
   terms: string[];
 } 

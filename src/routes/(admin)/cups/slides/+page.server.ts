@@ -3,10 +3,11 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
   try {
+    // Gunakan server-side client untuk fetch data
     const { data, error } = await supabaseClient
       .from('slides')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('position', { ascending: true });
 
     if (error) throw error;
 

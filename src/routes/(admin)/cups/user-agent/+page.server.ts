@@ -1,42 +1,53 @@
 import { supabaseClient } from '$lib/supabaseClient';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ cookies }) => {
+export const load: PageServerLoad = async ({ locals }) => {
   try {
-    // Get session from cookie
-    const adminData = cookies.get('admin_data');
-    if (!adminData) {
-      throw new Error('Not authenticated');
-    }
+    // Get session
+    const { data: { session } } = await locals.supabase.auth.getSession();
+    if (!session) throw new Error('No session');
 
-    const { data: users, error: usersError } = await supabaseClient
+    // Fetch coretax data dengan session
+    const { data: coretaxData, error: coretaxError } = await locals.supabase
       .from('coretax')
       .select(`
         id,
         username,
         email,
         level,
+        level_id,
         created_at,
         updated_at
       `)
       .order('created_at', { ascending: false });
 
-    const { data: privilages, error: privilagesError } = await supabaseClient
+    if (coretaxError) {
+      console.error('Coretax error:', coretaxError);
+      throw coretaxError;
+    }
+
+    // Fetch privilages dengan session
+    const { data: privilagesData, error: privilagesError } = await locals.supabase
       .from('privilage')
-      .select('level')
+      .select('*')
       .order('level');
 
-    if (usersError) throw usersError;
-    if (privilagesError) throw privilagesError;
+    if (privilagesError) {
+      console.error('Privilages error:', privilagesError);
+      throw privilagesError;
+    }
 
-    return {
-      users: users || [],
-      privilages: privilages || []
+    const result = {
+      coretax: coretaxData || [],
+      privilages: privilagesData || []
     };
+
+    return result;
+
   } catch (error) {
-    console.error('Error fetching data:', error);
+    console.error('Load error:', error);
     return {
-      users: [],
+      coretax: [],
       privilages: []
     };
   }
