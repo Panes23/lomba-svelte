@@ -8,9 +8,10 @@
   import { tebakanStore } from '$lib/stores/tebakanStore';
   import { browser } from '$app/environment';
   import type { Market } from '$lib/types/market';
-  import { enhance } from '$app/forms';
   import type { PageData } from './$types';
   import { writable } from 'svelte/store';
+
+  const baseUrl = import.meta.env.VITE_BASE_URL;
   
   // Definisikan tipe untuk website
   interface Website {
@@ -142,15 +143,20 @@
 
   // Format tanggal
   function formatDate(dateString) {
+    if (!dateString) return '-';
     const date = new Date(dateString);
-    const day = date.getDate();
-    const month = date.toLocaleString('id-ID', { month: 'long' });
-    const year = date.getFullYear();
-    const hour = String(date.getHours()).padStart(2, '0');
-    const minute = String(date.getMinutes()).padStart(2, '0');
-    const second = String(date.getSeconds()).padStart(2, '0');
+    const options: Intl.DateTimeFormatOptions = {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZone: 'UTC'
+    };
     
-    return `${day} ${month} ${year} pukul ${hour}:${minute}:${second}`;
+    return date.toLocaleString('id-ID', options).replace('.', ':').replace('.', ':');
   }
 
   let subscription;
@@ -390,6 +396,39 @@
     .slice(0, lomba.max_winner)
     : [];
 </script>
+
+<svelte:head>
+  {#if lomba}
+    <!-- Primary Meta Tags -->
+    <title>Lomba {lomba.markets?.name || 'Loading...'} {lomba.guess_type} | TEBAK ANGKA</title>
+    <meta name="title" content="Lomba {lomba.markets?.name || 'Loading...'} {lomba.guess_type} | TEBAK ANGKA">
+    <meta name="description" content="Ikuti lomba tebak angka {lomba.markets?.name} {lomba.guess_type} dengan total hadiah Rp {lomba.prize_pool?.toLocaleString('id-ID')}. Pasang tebakan Anda dan menangkan hadiah menarik!">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content={`${baseUrl}/tebakan/${lomba.id}`}>
+    <meta property="og:title" content="Lomba {lomba.markets?.name} {lomba.guess_type} | TEBAK ANGKA">
+    <meta property="og:description" content="Ikuti lomba tebak angka {lomba.markets?.name} {lomba.guess_type} dengan total hadiah Rp {lomba.prize_pool?.toLocaleString('id-ID')}. Pasang tebakan Anda dan menangkan hadiah menarik!">
+    <meta property="og:image" content={`${baseUrl}/og-image.png`}>
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content={`${baseUrl}/tebakan/${lomba.id}`}>
+    <meta property="twitter:title" content="Lomba {lomba.markets?.name} {lomba.guess_type} | TEBAK ANGKA">
+    <meta property="twitter:description" content="Ikuti lomba tebak angka {lomba.markets?.name} {lomba.guess_type} dengan total hadiah Rp {lomba.prize_pool?.toLocaleString('id-ID')}. Pasang tebakan Anda dan menangkan hadiah menarik!">
+    <meta property="twitter:image" content={`${baseUrl}/twitter-card.png`}>
+
+    <!-- Additional SEO Meta Tags -->
+    <meta name="keywords" content="tebak angka, {lomba.markets?.name?.toLowerCase()}, {lomba.guess_type}, lomba tebak angka, togel online">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="Indonesian">
+    <meta name="revisit-after" content="7 days">
+    <meta name="author" content="TEBAK ANGKA">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href={`${baseUrl}/tebakan/${lomba.id}`}>
+  {/if}
+</svelte:head>
 
 <div class="min-h-screen bg-[#1a1a1a] pt-24 pb-12">
   <div class="container mx-auto px-2 sm:px-4 max-w-6xl">

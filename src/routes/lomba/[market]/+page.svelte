@@ -2,11 +2,11 @@
   import { page } from '$app/stores';
   import { user } from '$lib/stores/authStore';
   import { goto } from '$app/navigation';
-  import Loading from '$lib/components/Loading.svelte';
   import type { Market } from '$lib/types/market';
-  import type { Lomba } from '$lib/types/lomba';
   import { MetaTags } from 'svelte-meta-tags';
   import { formatDateForInput } from '$lib/utils/date';
+
+  const baseUrl = import.meta.env.VITE_BASE_URL;
 
   export let data;
   // State untuk filter tanggal
@@ -135,17 +135,17 @@
 
 <MetaTags
   title={market ? `Lomba ${market.name} - Tebak Angka Berhadiah` : 'Lomba Tebak Angka'}
-  titleTemplate="%s | TEBAK ANGKA"
+  titleTemplate="TEBAK ANGKA | %s"
   description={market ? generateDescription(market.name) : 'Lomba tebak angka dengan hadiah menarik'}
-  canonical={`https://tebakangka.com/lomba/${marketName}`}
+  canonical={`${baseUrl}/lomba/${marketName}`}
   openGraph={{
     title: market ? `Lomba ${market.name} - Tebak Angka Berhadiah` : 'Lomba Tebak Angka',
     description: market ? generateDescription(market.name) : 'Lomba tebak angka dengan hadiah menarik',
-    url: `https://tebakangka.com/lomba/${marketName}`,
+    url: `${baseUrl}/lomba/${marketName}`,
     type: 'website',
     images: [
       {
-        url: market?.image || 'https://tebakangka.com/default-og.jpg',
+        url: market?.image || `${baseUrl}/default-og.jpg`,
         width: 1200,
         height: 630,
         alt: market ? `Lomba ${market.name}` : 'Lomba Tebak Angka'

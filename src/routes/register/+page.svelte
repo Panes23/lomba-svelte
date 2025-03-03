@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { MetaTags } from 'svelte-meta-tags';
   import { supabaseClient } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import Swal from 'sweetalert2';
+
+  const baseUrl = import.meta.env.VITE_BASE_URL;
 
   let username = '';
   let email = '';
@@ -89,19 +90,42 @@
   }
 </script>
 
-<MetaTags
-  title="Daftar Akun - Tebak Angka Berhadiah"
-  titleTemplate="%s | TEBAK ANGKA"
-  description="Daftar sekarang dan dapatkan kesempatan memenangkan hadiah jutaan rupiah dari berbagai pasaran yang tersedia."
-  canonical="https://tebakangka.com/register"
-  openGraph={{
-    title: "Daftar Akun - Tebak Angka Berhadiah",
-    description: "Daftar sekarang dan dapatkan kesempatan memenangkan hadiah jutaan rupiah.",
-    url: "https://tebakangka.com/register",
-    type: "website",
-    siteName: "TEBAK ANGKA"
-  }}
-/>
+<svelte:head>
+  <!-- Primary Meta Tags -->
+  <title>TEBAK ANGKA | Daftar Akun</title>
+  <meta name="title" content="TEBAK ANGKA | Daftar Akun">
+  <meta name="description" content="Daftar akun sekarang dan dapatkan kesempatan memenangkan hadiah jutaan rupiah dari berbagai pasaran yang tersedia di tebakangka.com">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content={`${baseUrl}/register`}>
+  <meta property="og:title" content="TEBAK ANGKA | Daftar Akun">
+  <meta property="og:description" content="Daftar akun sekarang dan dapatkan kesempatan memenangkan hadiah jutaan rupiah dari berbagai pasaran yang tersedia di tebakangka.com">
+  <meta property="og:image" content={`${baseUrl}/og-image.png`}>
+  <meta property="og:site_name" content="TEBAK ANGKA">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content={`${baseUrl}/register`}>
+  <meta property="twitter:title" content="TEBAK ANGKA | Daftar Akun">
+  <meta property="twitter:description" content="Daftar akun sekarang dan dapatkan kesempatan memenangkan hadiah jutaan rupiah dari berbagai pasaran yang tersedia di tebakangka.com">
+  <meta property="twitter:image" content={`${baseUrl}/twitter-card.png`}>
+
+  <!-- Additional SEO Meta Tags -->
+  <meta name="keywords" content="daftar tebak angka, registrasi tebak angka, buat akun tebak angka, tebak angka berhadiah, tebak angka online">
+  <meta name="robots" content="index, follow">
+  <meta name="language" content="Indonesian">
+  <meta name="revisit-after" content="7 days">
+  <meta name="author" content="TEBAK ANGKA">
+  <meta name="theme-color" content="#e62020">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="format-detection" content="telephone=no">
+  
+  <!-- Canonical URL -->
+  <link rel="canonical" href={`${baseUrl}/register`}>
+</svelte:head>
 
 <div class="min-h-screen bg-[#1a1a1a] pt-24 pb-16">
   <div class="container mx-auto px-4">

@@ -1,5 +1,6 @@
 <script lang="ts">
   import Swal from '$lib/utils/swal';
+  import { supabaseClient } from '$lib/supabaseClient';
 
   let loading = false;
   let searchQuery = '';
@@ -33,6 +34,75 @@
   $: filteredUsers = users.filter(item => 
     item.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Fungsi untuk mengubah status user
+  async function toggleUserStatus(userId: string, currentStatus: string) {
+    try {
+      const newStatus = currentStatus === 'active' ? 'banned' : 'active';
+      const actionText = newStatus === 'banned' ? 'banned' : 'mengaktifkan kembali';
+      
+      const result = await Swal.fire({
+        title: `Apakah anda yakin ingin ${actionText} user ini?`,
+        text: `User akan di${actionText}`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e62020',
+        cancelButtonColor: '#3f3f3f',
+        confirmButtonText: 'Ya',
+        cancelButtonText: 'Batal',
+        background: '#222',
+        color: '#fff'
+      });
+
+      if (result.isConfirmed) {
+        loading = true;
+
+        // Update status user menggunakan fetch API
+        const response = await fetch('/api/users/toggle-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId,
+            newStatus
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Gagal mengubah status user');
+        }
+
+        // Update local state
+        users = users.map(user => 
+          user.id === userId ? { ...user, status: newStatus } : user
+        );
+
+        await Swal.fire({
+          title: 'Berhasil!',
+          text: `User berhasil di${actionText}`,
+          icon: 'success',
+          confirmButtonColor: '#e62020',
+          background: '#222',
+          color: '#fff'
+        });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      await Swal.fire({
+        title: 'Error!',
+        text: error.message || 'Gagal mengubah status user',
+        icon: 'error',
+        confirmButtonColor: '#e62020',
+        background: '#222',
+        color: '#fff'
+      });
+    } finally {
+      loading = false;
+    }
+  }
 </script>
 
 <div class="space-y-6 px-6 py-10">
@@ -53,19 +123,21 @@
       <table class="w-full text-left">
         <thead>
           <tr class="bg-[#2a2a2a] text-gray-400 text-sm">
+            <th class="px-4 py-3">Status</th>
             <th class="px-4 py-3">Username</th>
             <th class="px-4 py-3">Email</th>
             <th class="px-4 py-3">Phone</th>
             <th class="px-4 py-3">Birth Date</th>
             <th class="px-4 py-3">Created At</th>
             <th class="px-4 py-3">Updated At</th>
+            <th class="px-4 py-3">Action</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-800">
           {#if loading}
             {#each Array(5) as _}
               <tr class="animate-pulse">
-                {#each Array(6) as _}
+                {#each Array(8) as _}
                   <td class="px-4 py-3">
                     <div class="h-4 bg-gray-800 rounded w-24"></div>
                   </td>
@@ -75,12 +147,32 @@
           {:else}
             {#each paginatedUsers as user}
               <tr class="text-gray-300 hover:bg-[#2a2a2a] transition-colors">
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 text-xs font-medium rounded-full
+                    {user.status === 'active' 
+                      ? 'bg-green-500/10 text-green-500' 
+                      : 'bg-red-500/10 text-red-500'}">
+                    {user.status || 'active'}
+                  </span>
+                </td>
                 <td class="px-4 py-3">{user.username || '-'}</td>
                 <td class="px-4 py-3">{user.email || '-'}</td>
                 <td class="px-4 py-3">{user.phone || '-'}</td>
                 <td class="px-4 py-3">{formatDate(user.birth_date)}</td>
                 <td class="px-4 py-3">{formatDate(user.created_at)}</td>
                 <td class="px-4 py-3">{formatDate(user.updated_at)}</td>
+                <td class="px-4 py-3">
+                  <button
+                    on:click={() => toggleUserStatus(user.id, user.status || 'active')}
+                    class="px-3 py-1 text-xs font-medium rounded-lg
+                      {user.status === 'active'
+                        ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                        : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'}
+                      transition-colors"
+                  >
+                    {user.status === 'active' ? 'Ban User' : 'Unban User'}
+                  </button>
+                </td>
               </tr>
             {/each}
           {/if}

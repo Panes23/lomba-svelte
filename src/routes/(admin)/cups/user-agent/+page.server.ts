@@ -1,54 +1,50 @@
-import { supabaseClient } from '$lib/supabaseClient';
+import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
+import { VITE_SUPABASE_URL } from '$env/static/private';
+import { createClient } from '@supabase/supabase-js';
 
-export const load: PageServerLoad = async ({ locals }) => {
+const supabaseAdmin = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+export const load: PageServerLoad = async ({ cookies }) => {
   try {
-    // Get session
-    const { data: { session } } = await locals.supabase.auth.getSession();
-    if (!session) throw new Error('No session');
-
-    // Fetch coretax data dengan session
-    const { data: coretaxData, error: coretaxError } = await locals.supabase
-      .from('coretax')
-      .select(`
-        id,
-        username,
-        email,
-        level,
-        level_id,
-        created_at,
-        updated_at
-      `)
-      .order('created_at', { ascending: false });
-
-    if (coretaxError) {
-      console.error('Coretax error:', coretaxError);
-      throw coretaxError;
+    // Cek admin data dari cookie
+    const adminData = cookies.get('admin_data');
+    if (!adminData) {
+      throw redirect(303, '/cups/login');
     }
 
-    // Fetch privilages dengan session
-    const { data: privilagesData, error: privilagesError } = await locals.supabase
+    const admin = JSON.parse(adminData);
+    
+    // Cek akses user agent
+    const { data: privilageData } = await supabaseAdmin
       .from('privilage')
-      .select('*')
-      .order('level');
+      .select('akses')
+      .eq('level', admin.level)
+      .single();
 
-    if (privilagesError) {
-      console.error('Privilages error:', privilagesError);
-      throw privilagesError;
+    if (!privilageData?.akses?.includes('user agent')) {
+      throw error(403, 'Unauthorized - Insufficient privileges');
     }
 
-    const result = {
-      coretax: coretaxData || [],
-      privilages: privilagesData || []
-    };
+    // Ambil data coretax dan privilage
+    const [coretaxResult, privilagesResult] = await Promise.all([
+      supabaseAdmin.from('coretax').select('*').order('created_at', { ascending: false }),
+      supabaseAdmin.from('privilage').select('*')
+    ]);
 
-    return result;
+    if (coretaxResult.error) throw coretaxResult.error;
+    if (privilagesResult.error) throw privilagesResult.error;
 
-  } catch (error) {
-    console.error('Load error:', error);
     return {
-      coretax: [],
-      privilages: []
+      coretax: coretaxResult.data || [],
+      privilages: privilagesResult.data || []
     };
+  } catch (err) {
+    console.error('Load error:', err);
+    if (err.status === 303) {
+      throw err;
+    }
+    throw error(500, err.message || 'Internal server error');
   }
 }; 

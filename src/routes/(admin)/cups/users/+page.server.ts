@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
     const { data: users, error: usersError } = await supabaseClient
       .from('users')
-      .select('*')
+      .select('id, username, email, phone, birth_date, created_at, updated_at, status')
       .order('created_at', { ascending: false });
 
     if (usersError) throw usersError;

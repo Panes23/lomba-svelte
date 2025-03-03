@@ -21,6 +21,7 @@
   // Daftar semua akses yang tersedia
   const availableAccess = [
     'list users',
+    'fake users',
     'list lomba',
     'pasaran lomba',
     'websites',

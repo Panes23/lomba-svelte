@@ -17,6 +17,30 @@
   let isUserMenuOpen = false;
   const username = writable('');
 
+  // Update username saat user berubah
+  $: if ($user) {
+    fetch('/api/users/get-username', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: $user.id
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.username) {
+        username.set(data.username);
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching username:', error);
+    });
+  } else {
+    username.set('');
+  }
+
   const navLinks = [
     { href: '/', text: 'Beranda' },
     { type: 'dropdown', text: 'Pasaran Lomba' },

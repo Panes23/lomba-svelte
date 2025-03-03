@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
 
+  const baseUrl = import.meta.env.VITE_BASE_URL;
+
   const terms = [
     {
       title: "1. Ketentuan Umum",
@@ -53,23 +55,23 @@
 
 <svelte:head>
   <!-- Primary Meta Tags -->
-  <title>Syarat & Ketentuan - TEBAK ANGKA | Ketentuan Penggunaan Platform</title>
-  <meta name="title" content="Syarat & Ketentuan - TEBAK ANGKA | Ketentuan Penggunaan Platform">
+  <title>TEBAK ANGKA | Syarat & Ketentuan</title>
+  <meta name="title" content="TEBAK ANGKA | Syarat & Ketentuan">
   <meta name="description" content="Pelajari syarat dan ketentuan penggunaan platform TEBAK ANGKA. Informasi lengkap tentang pendaftaran, transaksi, keamanan, dan tanggung jawab pengguna.">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tebakangka.com/terms">
-  <meta property="og:title" content="Syarat & Ketentuan - TEBAK ANGKA | Ketentuan Penggunaan Platform">
+  <meta property="og:url" content="{baseUrl}/terms">
+  <meta property="og:title" content="TEBAK ANGKA | Syarat & Ketentuan">
   <meta property="og:description" content="Pelajari syarat dan ketentuan penggunaan platform TEBAK ANGKA. Informasi lengkap tentang pendaftaran, transaksi, keamanan, dan tanggung jawab pengguna.">
-  <meta property="og:image" content="https://tebakangka.com/images/terms-og-image.jpg">
+  <meta property="og:image" content="{baseUrl}/og-image.png">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://tebakangka.com/terms">
-  <meta property="twitter:title" content="Syarat & Ketentuan - TEBAK ANGKA | Ketentuan Penggunaan Platform">
+  <meta property="twitter:url" content="{baseUrl}/terms">
+  <meta property="twitter:title" content="TEBAK ANGKA | Syarat & Ketentuan">
   <meta property="twitter:description" content="Pelajari syarat dan ketentuan penggunaan platform TEBAK ANGKA. Informasi lengkap tentang pendaftaran, transaksi, keamanan, dan tanggung jawab pengguna.">
-  <meta property="twitter:image" content="https://tebakangka.com/images/terms-twitter-card.jpg">
+  <meta property="twitter:image" content="{baseUrl}/twitter-card.png">
 
   <!-- Additional SEO Meta Tags -->
   <meta name="keywords" content="syarat dan ketentuan tebak angka, ketentuan layanan, kebijakan platform, aturan main, keamanan data">
@@ -78,7 +80,7 @@
   <meta name="author" content="TEBAK ANGKA">
   
   <!-- Canonical URL -->
-  <link rel="canonical" href="https://tebakangka.com/terms">
+  <link rel="canonical" href="{baseUrl}/terms">
   
   <!-- Additional Meta -->
   <meta name="theme-color" content="#e62020">

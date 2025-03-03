@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
 
+  const baseUrl = import.meta.env.VITE_BASE_URL;
+
   const policies = [
     {
       title: "1. Kebijakan Cookie",
@@ -57,23 +59,23 @@
 
 <svelte:head>
   <!-- Primary Meta Tags -->
-  <title>Cookie Policy - TEBAK ANGKA | Kebijakan Penggunaan Cookie</title>
-  <meta name="title" content="Cookie Policy - TEBAK ANGKA | Kebijakan Penggunaan Cookie">
+  <title>TEBAK ANGKA | Cookie Policy</title>
+  <meta name="title" content="TEBAK ANGKA | Cookie Policy">
   <meta name="description" content="Kebijakan lengkap tentang penggunaan cookie di platform TEBAK ANGKA. Pelajari bagaimana kami menggunakan cookie untuk meningkatkan keamanan dan pengalaman pengguna.">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tebakangka.com/cookie-policy">
-  <meta property="og:title" content="Cookie Policy - TEBAK ANGKA | Kebijakan Penggunaan Cookie">
+  <meta property="og:url" content="{baseUrl}/cookie-policy">
+  <meta property="og:title" content="TEBAK ANGKA | Cookie Policy">
   <meta property="og:description" content="Kebijakan lengkap tentang penggunaan cookie di platform TEBAK ANGKA. Pelajari bagaimana kami menggunakan cookie untuk meningkatkan keamanan dan pengalaman pengguna.">
-  <meta property="og:image" content="https://tebakangka.com/images/cookie-policy-og-image.jpg">
+  <meta property="og:image" content="{baseUrl}/og-image.png">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://tebakangka.com/cookie-policy">
-  <meta property="twitter:title" content="Cookie Policy - TEBAK ANGKA | Kebijakan Penggunaan Cookie">
+  <meta property="twitter:url" content="{baseUrl}/cookie-policy">
+  <meta property="twitter:title" content="TEBAK ANGKA | Cookie Policy">
   <meta property="twitter:description" content="Kebijakan lengkap tentang penggunaan cookie di platform TEBAK ANGKA. Pelajari bagaimana kami menggunakan cookie untuk meningkatkan keamanan dan pengalaman pengguna.">
-  <meta property="twitter:image" content="https://tebakangka.com/images/cookie-policy-twitter-card.jpg">
+  <meta property="twitter:image" content="{baseUrl}/twitter-card.png">
 
   <!-- Additional SEO Meta Tags -->
   <meta name="keywords" content="cookie policy tebak angka, kebijakan cookie, penggunaan cookie, privasi cookie, keamanan data">
@@ -82,7 +84,7 @@
   <meta name="author" content="TEBAK ANGKA">
   
   <!-- Canonical URL -->
-  <link rel="canonical" href="https://tebakangka.com/cookie-policy">
+  <link rel="canonical" href="{baseUrl}/cookie-policy">
   
   <!-- Additional Meta -->
   <meta name="theme-color" content="#e62020">

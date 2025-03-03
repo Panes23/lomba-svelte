@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
+
+  const baseUrl = import.meta.env.VITE_BASE_URL;
   
   const faqData = [
     {
@@ -51,23 +53,23 @@
 
 <svelte:head>
   <!-- Primary Meta Tags -->
-  <title>FAQ - TEBAK ANGKA | Pertanyaan Umum Seputar Platform</title>
-  <meta name="title" content="FAQ - TEBAK ANGKA | Pertanyaan Umum Seputar Platform">
+  <title>TEBAK ANGKA | FAQ</title>
+  <meta name="title" content="TEBAK ANGKA | FAQ">
   <meta name="description" content="Temukan jawaban untuk pertanyaan seputar cara bermain, deposit, withdraw, keamanan, dan informasi penting lainnya di platform tebak angka terpercaya TEBAK ANGKA.">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tebakangka.com/faq">
-  <meta property="og:title" content="FAQ - TEBAK ANGKA | Pertanyaan Umum Seputar Platform">
+  <meta property="og:url" content="{baseUrl}/faq">
+  <meta property="og:title" content="TEBAK ANGKA | FAQ">
   <meta property="og:description" content="Temukan jawaban untuk pertanyaan seputar cara bermain, deposit, withdraw, keamanan, dan informasi penting lainnya di platform tebak angka terpercaya TEBAK ANGKA.">
-  <meta property="og:image" content="https://tebakangka.com/images/faq-og-image.jpg">
+  <meta property="og:image" content="{baseUrl}/og-image.png">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://tebakangka.com/faq">
-  <meta property="twitter:title" content="FAQ - TEBAK ANGKA | Pertanyaan Umum Seputar Platform">
+  <meta property="twitter:url" content="{baseUrl}/faq">
+  <meta property="twitter:title" content="TEBAK ANGKA | FAQ">
   <meta property="twitter:description" content="Temukan jawaban untuk pertanyaan seputar cara bermain, deposit, withdraw, keamanan, dan informasi penting lainnya di platform tebak angka terpercaya TEBAK ANGKA.">
-  <meta property="twitter:image" content="https://tebakangka.com/images/faq-twitter-card.jpg">
+  <meta property="twitter:image" content="{baseUrl}/twitter-card.png">
 
   <!-- Additional SEO Meta Tags -->
   <meta name="keywords" content="faq tebak angka, cara bermain tebak angka, deposit withdraw tebak angka, keamanan tebak angka, bantuan tebak angka, customer service tebak angka">
@@ -76,7 +78,7 @@
   <meta name="author" content="TEBAK ANGKA">
   
   <!-- Canonical URL -->
-  <link rel="canonical" href="https://tebakangka.com/faq">
+  <link rel="canonical" href="{baseUrl}/faq">
   
   <!-- Additional Meta -->
   <meta name="theme-color" content="#e62020">

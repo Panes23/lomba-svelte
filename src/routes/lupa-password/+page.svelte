@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { MetaTags } from 'svelte-meta-tags';
   import { supabaseClient } from '$lib/supabaseClient';
   import Swal from '$lib/utils/swal';
+
+  const baseUrl = import.meta.env.VITE_BASE_URL;
 
   let email = '';
   let loading = false;
@@ -32,12 +33,42 @@
   }
 </script>
 
-<MetaTags
-  title="Lupa Password - Tebak Angka"
-  titleTemplate="%s | TEBAK ANGKA"
-  description="Reset password akun Anda di TEBAK ANGKA dengan mudah dan aman."
-  canonical="https://tebakangka.com/lupa-password"
-/>
+<svelte:head>
+  <!-- Primary Meta Tags -->
+  <title>TEBAK ANGKA | Lupa Password</title>
+  <meta name="title" content="TEBAK ANGKA | Lupa Password">
+  <meta name="description" content="Reset password akun Anda di tebakangka.com dengan mudah dan aman. Dapatkan link reset password melalui email untuk mengamankan kembali akun Anda.">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content={`${baseUrl}/lupa-password`}>
+  <meta property="og:title" content="TEBAK ANGKA | Lupa Password">
+  <meta property="og:description" content="Reset password akun Anda di tebakangka.com dengan mudah dan aman. Dapatkan link reset password melalui email untuk mengamankan kembali akun Anda.">
+  <meta property="og:image" content={`${baseUrl}/og-image.png`}>
+  <meta property="og:site_name" content="TEBAK ANGKA">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content={`${baseUrl}/lupa-password`}>
+  <meta property="twitter:title" content="TEBAK ANGKA | Lupa Password">
+  <meta property="twitter:description" content="Reset password akun Anda di tebakangka.com dengan mudah dan aman. Dapatkan link reset password melalui email untuk mengamankan kembali akun Anda.">
+  <meta property="twitter:image" content={`${baseUrl}/twitter-card.png`}>
+
+  <!-- Additional SEO Meta Tags -->
+  <meta name="keywords" content="lupa password tebak angka, reset password tebak angka, ganti password tebak angka, recovery akun tebak angka">
+  <meta name="robots" content="index, follow">
+  <meta name="language" content="Indonesian">
+  <meta name="revisit-after" content="7 days">
+  <meta name="author" content="TEBAK ANGKA">
+  <meta name="theme-color" content="#e62020">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="format-detection" content="telephone=no">
+  
+  <!-- Canonical URL -->
+  <link rel="canonical" href={`${baseUrl}/lupa-password`}>
+</svelte:head>
 
 <div class="min-h-screen bg-[#1a1a1a] pt-24 pb-16">
   <div class="container mx-auto px-4">

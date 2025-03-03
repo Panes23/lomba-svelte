@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { MetaTags } from 'svelte-meta-tags';
 
   let contacts = [];
   let socialMedia = [];
   let loading = true;
   let error = null;
+  const baseUrl = import.meta.env.VITE_BASE_URL;
 
   onMount(async () => {
     try {
@@ -36,23 +36,23 @@
 
 <svelte:head>
   <!-- Primary Meta Tags -->
-  <title>Hubungi Kami - TEBAK ANGKA | Customer Service 24/7</title>
-  <meta name="title" content="Hubungi Kami - TEBAK ANGKA | Customer Service 24/7">
+  <title>TEBAK ANGKA | Hubungi Kami</title>
+  <meta name="title" content="TEBAK ANGKA | Hubungi Kami">
   <meta name="description" content="Hubungi tim support TEBAK ANGKA yang siap membantu Anda 24/7. Tersedia layanan WhatsApp, Telegram, dan Email untuk memberikan bantuan terbaik.">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tebakangka.com/contact">
-  <meta property="og:title" content="Hubungi Kami - TEBAK ANGKA | Customer Service 24/7">
+  <meta property="og:url" content="{baseUrl}/contact">
+  <meta property="og:title" content="TEBAK ANGKA | Hubungi Kami">
   <meta property="og:description" content="Hubungi tim support TEBAK ANGKA yang siap membantu Anda 24/7. Tersedia layanan WhatsApp, Telegram, dan Email untuk memberikan bantuan terbaik.">
-  <meta property="og:image" content="https://tebakangka.com/images/contact-og-image.jpg">
+  <meta property="og:image" content="{baseUrl}/og-image.png">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://tebakangka.com/contact">
-  <meta property="twitter:title" content="Hubungi Kami - TEBAK ANGKA | Customer Service 24/7">
+  <meta property="twitter:url" content="{baseUrl}/contact">
+  <meta property="twitter:title" content="TEBAK ANGKA | Hubungi Kami">
   <meta property="twitter:description" content="Hubungi tim support TEBAK ANGKA yang siap membantu Anda 24/7. Tersedia layanan WhatsApp, Telegram, dan Email untuk memberikan bantuan terbaik.">
-  <meta property="twitter:image" content="https://tebakangka.com/images/contact-twitter-card.jpg">
+  <meta property="twitter:image" content="{baseUrl}/twitter-card.png">
 
   <!-- Additional SEO Meta Tags -->
   <meta name="keywords" content="kontak tebak angka, customer service tebak angka, bantuan tebak angka, whatsapp tebak angka, telegram tebak angka, email tebak angka">
@@ -61,11 +61,11 @@
   <meta name="author" content="TEBAK ANGKA">
   
   <!-- Canonical URL -->
-  <link rel="canonical" href="https://tebakangka.com/contact">
+  <link rel="canonical" href="{baseUrl}/contact">
   
   <!-- Additional Meta -->
   <meta name="theme-color" content="#e62020">
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
 </svelte:head>
 
 <div class="pt-24 pb-16 bg-[#1a1a1a] min-h-screen">

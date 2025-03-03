@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
 
+  const baseUrl = import.meta.env.VITE_BASE_URL;
+
   const policies = [
     {
       title: "1. Informasi yang Kami Kumpulkan",
@@ -58,23 +60,23 @@
 
 <svelte:head>
   <!-- Primary Meta Tags -->
-  <title>Kebijakan Privasi - TEBAK ANGKA | Perlindungan Data Pengguna</title>
-  <meta name="title" content="Kebijakan Privasi - TEBAK ANGKA | Perlindungan Data Pengguna">
+  <title>TEBAK ANGKA | Kebijakan Privasi</title>
+  <meta name="title" content="TEBAK ANGKA | Kebijakan Privasi">
   <meta name="description" content="Pelajari bagaimana TEBAK ANGKA melindungi dan mengelola data pengguna. Informasi lengkap tentang pengumpulan, penggunaan, dan perlindungan data pribadi Anda.">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tebakangka.com/privacy">
-  <meta property="og:title" content="Kebijakan Privasi - TEBAK ANGKA | Perlindungan Data Pengguna">
+  <meta property="og:url" content="{baseUrl}/privacy">
+  <meta property="og:title" content="TEBAK ANGKA | Kebijakan Privasi">
   <meta property="og:description" content="Pelajari bagaimana TEBAK ANGKA melindungi dan mengelola data pengguna. Informasi lengkap tentang pengumpulan, penggunaan, dan perlindungan data pribadi Anda.">
-  <meta property="og:image" content="https://tebakangka.com/images/privacy-og-image.jpg">
+  <meta property="og:image" content="{baseUrl}/og-image.png">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://tebakangka.com/privacy">
-  <meta property="twitter:title" content="Kebijakan Privasi - TEBAK ANGKA | Perlindungan Data Pengguna">
+  <meta property="twitter:url" content="{baseUrl}/privacy">
+  <meta property="twitter:title" content="TEBAK ANGKA | Kebijakan Privasi">
   <meta property="twitter:description" content="Pelajari bagaimana TEBAK ANGKA melindungi dan mengelola data pengguna. Informasi lengkap tentang pengumpulan, penggunaan, dan perlindungan data pribadi Anda.">
-  <meta property="twitter:image" content="https://tebakangka.com/images/privacy-twitter-card.jpg">
+  <meta property="twitter:image" content="{baseUrl}/twitter-card.png">
 
   <!-- Additional SEO Meta Tags -->
   <meta name="keywords" content="privasi tebak angka, keamanan data, perlindungan data, kebijakan privasi, data pengguna, enkripsi data">
@@ -83,7 +85,7 @@
   <meta name="author" content="TEBAK ANGKA">
   
   <!-- Canonical URL -->
-  <link rel="canonical" href="https://tebakangka.com/privacy">
+  <link rel="canonical" href="{baseUrl}/privacy">
   
   <!-- Additional Meta -->
   <meta name="theme-color" content="#e62020">

@@ -9,7 +9,6 @@ const CACHE = 'cache-v1';
 const ASSETS = [
   '/',
   '/manifest.webmanifest',
-  '/favicon.png',
   '/favicon.svg',
   '/apple-touch-icon.png',
   '/pwa-192x192.png',

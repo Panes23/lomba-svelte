@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
 
+  const baseUrl = import.meta.env.VITE_BASE_URL;
+
   const stats = [
     { number: "10K+", label: "Pengguna Aktif" },
     { number: "6+", label: "Pasaran Tersedia" },
@@ -35,23 +37,23 @@
 
 <svelte:head>
   <!-- Primary Meta Tags -->
-  <title>Tentang Kami - TEBAK ANGKA | Platform Tebak Angka Terpercaya</title>
-  <meta name="title" content="Tentang Kami - TEBAK ANGKA | Platform Tebak Angka Terpercaya">
+  <title>TEBAK ANGKA | Tentang Kami</title>
+  <meta name="title" content="TEBAK ANGKA | Tentang Kami">
   <meta name="description" content="Pelajari lebih lanjut tentang TEBAK ANGKA, platform tebak angka terpercaya dengan sistem yang fair dan transparan. Nikmati pengalaman bermain yang aman dengan dukungan customer service 24/7.">
   
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tebakangka.com/about">
-  <meta property="og:title" content="Tentang Kami - TEBAK ANGKA | Platform Tebak Angka Terpercaya">
+  <meta property="og:url" content="{baseUrl}/about">
+  <meta property="og:title" content="TEBAK ANGKA | Tentang Kami">
   <meta property="og:description" content="Pelajari lebih lanjut tentang TEBAK ANGKA, platform tebak angka terpercaya dengan sistem yang fair dan transparan. Nikmati pengalaman bermain yang aman dengan dukungan customer service 24/7.">
-  <meta property="og:image" content="https://tebakangka.com/images/about-og-image.jpg">
+  <meta property="og:image" content="{baseUrl}/og-image.png">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://tebakangka.com/about">
-  <meta property="twitter:title" content="Tentang Kami - TEBAK ANGKA | Platform Tebak Angka Terpercaya">
+  <meta property="twitter:url" content="{baseUrl}/about">
+  <meta property="twitter:title" content="TEBAK ANGKA | Tentang Kami">
   <meta property="twitter:description" content="Pelajari lebih lanjut tentang TEBAK ANGKA, platform tebak angka terpercaya dengan sistem yang fair dan transparan. Nikmati pengalaman bermain yang aman dengan dukungan customer service 24/7.">
-  <meta property="twitter:image" content="https://tebakangka.com/images/about-twitter-card.jpg">
+  <meta property="twitter:image" content="{baseUrl}/twitter-card.png">
 
   <!-- Additional SEO Meta Tags -->
   <meta name="keywords" content="tentang tebak angka, visi misi tebak angka, keamanan tebak angka, sistem tebak angka, customer service 24/7, platform terpercaya">
@@ -60,7 +62,7 @@
   <meta name="author" content="TEBAK ANGKA">
   
   <!-- Canonical URL -->
-  <link rel="canonical" href="https://tebakangka.com/about">
+  <link rel="canonical" href="{baseUrl}/about">
   
   <!-- Additional Meta -->
   <meta name="theme-color" content="#e62020">

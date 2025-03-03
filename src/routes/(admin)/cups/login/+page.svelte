@@ -11,34 +11,25 @@
     try {
       loading = true;
 
-      // Login dengan Supabase Auth
-      const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
-        email: usernameOrEmail.includes('@') ? usernameOrEmail : 'boss.rangga23@gmail.com',
-        password: password
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          usernameOrEmail,
+          password
+        })
       });
 
-      if (authError) throw authError;
+      const result = await response.json();
 
-      // Setelah login berhasil, ambil data dari coretax
-      const { data: userData, error: userError } = await supabaseClient
-        .from('coretax')
-        .select('*')
-        .or(`email.eq."${usernameOrEmail}",username.eq."${usernameOrEmail}"`)
-        .single();
-
-      if (userError || !userData) {
-        throw new Error('Data user tidak ditemukan');
+      if (!response.ok) {
+        throw new Error(result.message || 'Gagal login');
       }
 
       // Set cookie untuk menyimpan data login
-      const cookieValue = JSON.stringify({
-        id: userData.id,
-        email: userData.email,
-        username: userData.username,
-        level: userData.level,
-        access_token: authData.session?.access_token
-      });
-      document.cookie = `admin_data=${cookieValue}; path=/; max-age=86400; secure; samesite=strict`;
+      document.cookie = `admin_data=${JSON.stringify(result.data)}; path=/; max-age=86400; secure; samesite=strict`;
 
       // Redirect ke dashboard
       goto('/cups');
@@ -60,7 +51,9 @@
   <div class="w-full max-w-sm">
     <!-- Logo & Title -->
     <div class="text-center mb-8">
-      <img src="/favicon.svg" alt="Logo" class="w-16 h-16 mx-auto mb-4" />
+      <a href="/">
+        <img src="/favicon.svg" alt="Logo" class="w-16 h-16 mx-auto mb-4" />
+      </a>
       <h1 class="text-2xl font-bold text-white">TEBAK ANGKA</h1>
       <p class="text-sm text-gray-400 mt-1">Dashboard Admin</p>
     </div>
@@ -108,7 +101,7 @@
 
       <div class="text-center mt-4">
         <a 
-          href="/cups/lupa-password"
+          href="/lupa-password"
           class="text-sm text-gray-400 hover:text-white transition-colors"
         >
           Lupa Password?

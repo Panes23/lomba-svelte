@@ -1,7 +1,6 @@
 <script lang="ts">
   import Logo from './Logo.svelte';
   import { onMount } from 'svelte';
-  import { supabaseClient } from '$lib/supabaseClient';
 
   const currentYear = new Date().getFullYear();
 
@@ -9,8 +8,7 @@
     { text: 'Beranda', href: '/' },
     { text: 'Tentang Kami', href: '/about' },
     { text: 'Kontak', href: '/contact' },
-    { text: 'FAQ', href: '/faq' },
-    { text: 'Syarat & Ketentuan', href: '/terms' }
+    { text: 'FAQ', href: '/faq' }
   ];
 
   let contacts = [];

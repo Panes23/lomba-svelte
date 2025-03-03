@@ -28,17 +28,34 @@
 
   export let data;
   $: {
+    console.log('Data received:', data);
     users = data.coretax || [];
     privilages = data.privilages || [];
+    console.log('Users array:', users);
+    console.log('Privilages array:', privilages);
   }
+
+  onMount(async () => {
+    console.log('Component mounted, refreshing data...');
+    await refreshData();
+  });
 
   // Refresh data function
   async function refreshData() {
     try {
       loading = true;
+      console.log('Fetching fresh data...');
+      
       const response = await fetch('/api/xcoretax');
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      
       const refreshedData = await response.json();
+      console.log('Refreshed data received:', refreshedData);
+      
       users = refreshedData;
+      console.log('Users array updated:', users);
     } catch (error) {
       console.error('Error refreshing data:', error);
       await Swal.fire({
