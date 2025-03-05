@@ -1,102 +1,82 @@
 import { supabaseClient } from '$lib/supabaseClient';
+import type { RequestHandler } from './$types';
 
-// Daftar domain yang didukung
-const domains = [
-  'https://tebakangka.com',
-  'https://tebakangka.net',
-  'https://tebakangka.org'
-];
-
-// Daftar halaman statis
-const staticPages = [
-  '/',
-  '/about',
-  '/contact',
-  '/faq',
-  '/login',
-  '/register',
-  '/lupa-password',
-  '/privacy',
-  '/terms',
-  '/cookies',
-  '/sitemap'
-];
-
-export async function GET({ url, request }) {
+export const GET: RequestHandler = async ({ url }) => {
   try {
-    // Deteksi domain dari request
-    const host = request.headers.get('host');
-    const protocol = url.protocol || 'https:';
-    const currentDomain = `${protocol}//${host}`;
-    
-    // Pilih domain yang sesuai atau gunakan default
-    const domain = domains.find(d => d.includes(host)) || domains[0];
+    // Ambil data markets
+    const { data: markets, error: marketsError } = await supabaseClient
+      .from('markets')
+      .select('name')
+      .order('name');
 
-    // Fetch data dari Supabase
-    const [marketsRes, lombaRes] = await Promise.all([
-      supabaseClient.from('markets').select('name').order('name'),
-      supabaseClient.from('lomba').select('id, created_at').order('created_at', { ascending: false })
-    ]);
+    if (marketsError) throw marketsError;
 
-    if (marketsRes.error) throw marketsRes.error;
-    if (lombaRes.error) throw lombaRes.error;
+    // Ambil data lomba
+    const { data: lomba, error: lombaError } = await supabaseClient
+      .from('lomba')
+      .select(`
+        id,
+        markets:market_id (name),
+        guess_type,
+        created_at
+      `)
+      .order('created_at', { ascending: false });
 
-    // Generate XML
-    const xml = `<?xml version="1.0" encoding="UTF-8" ?>
-<urlset 
-  xmlns="https://www.sitemaps.org/schemas/sitemap/0.9"
-  xmlns:xhtml="https://www.w3.org/1999/xhtml"
->
+    if (lombaError) throw lombaError;
+
+    // Daftar halaman statis
+    const staticPages = [
+      '/',
+      '/about',
+      '/contact',
+      '/faq',
+      '/login',
+      '/register',
+      '/lupa-password',
+      '/privacy',
+      '/terms',
+      '/cookies'
+    ];
+
+    // Base URL dari environment variable
+    const baseUrl = import.meta.env.VITE_BASE_URL || url.origin;
+
+    // Buat XML sitemap
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   ${staticPages.map(page => `
   <url>
-    <loc>${domain}${page}</loc>
-    ${domains.map(d => d !== domain ? `
-    <xhtml:link 
-      rel="alternate" 
-      hreflang="${d.includes('.com') ? 'x-default' : d.split('.').pop()}"
-      href="${d}${page}"
-    />` : '').join('')}
+    <loc>${baseUrl}${page}</loc>
     <changefreq>weekly</changefreq>
     <priority>${page === '/' ? '1.0' : '0.8'}</priority>
   </url>`).join('')}
-
-  ${marketsRes.data.map(market => `
+  
+  ${markets.map(market => `
   <url>
-    <loc>${domain}/lomba/${encodeURIComponent(market.name.toLowerCase())}</loc>
-    ${domains.map(d => d !== domain ? `
-    <xhtml:link 
-      rel="alternate" 
-      hreflang="${d.includes('.com') ? 'x-default' : d.split('.').pop()}"
-      href="${d}/lomba/${encodeURIComponent(market.name.toLowerCase())}"
-    />` : '').join('')}
+    <loc>${baseUrl}/lomba/${encodeURIComponent(market.name)}</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>`).join('')}
-
-  ${lombaRes.data.map(item => `
+  
+  ${lomba.map(item => `
   <url>
-    <loc>${domain}/tebakan/${item.id}</loc>
-    ${domains.map(d => d !== domain ? `
-    <xhtml:link 
-      rel="alternate" 
-      hreflang="${d.includes('.com') ? 'x-default' : d.split('.').pop()}"
-      href="${d}/tebakan/${item.id}"
-    />` : '').join('')}
+    <loc>${baseUrl}/tebakan/${item.id}</loc>
     <lastmod>${new Date(item.created_at).toISOString()}</lastmod>
-    <changefreq>daily</changefreq>
+    <changefreq>hourly</changefreq>
     <priority>0.9</priority>
   </url>`).join('')}
-</urlset>`.trim();
+</urlset>`;
 
-    // Return response dengan header yang sesuai
+    // Return XML response
     return new Response(xml, {
       headers: {
         'Content-Type': 'application/xml',
         'Cache-Control': 'max-age=0, s-maxage=3600'
       }
     });
+
   } catch (error) {
     console.error('Error generating sitemap:', error);
     return new Response('Error generating sitemap', { status: 500 });
   }
-} 
+}; 
