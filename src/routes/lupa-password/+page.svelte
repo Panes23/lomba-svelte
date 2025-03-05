@@ -10,9 +10,23 @@
   async function handleResetPassword() {
     try {
       loading = true;
-      const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+      
+      const response = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email })
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw { 
+          message: result.error,
+          code: result.code
+        };
+      }
 
       await Swal.fire({
         title: 'Berhasil!',
@@ -23,7 +37,7 @@
     } catch (error) {
       await Swal.fire({
         title: 'Error!',
-        text: error.message,
+        text: error.message || 'Terjadi kesalahan saat mengirim link reset password',
         icon: 'error',
         confirmButtonColor: '#e62020'
       });

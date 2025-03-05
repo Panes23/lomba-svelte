@@ -15,53 +15,126 @@
   let error = null;
   let successMessage = null;
 
+  // Fungsi untuk validasi email
+  function isValidEmail(email: string) {
+    if (!email) {
+      return { isValid: false, message: 'Alamat email wajib diisi' };
+    }
+
+    // Validasi panjang email
+    if (email.length > 254) {
+      return { isValid: false, message: 'Alamat email terlalu panjang (maksimal 254 karakter)' };
+    }
+
+    // Validasi format dasar email
+    const emailRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?@[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+$/;
+    if (!emailRegex.test(email)) {
+      return { isValid: false, message: 'Format alamat email tidak valid. Contoh format yang benar: nama@domain.com' };
+    }
+
+    // Validasi karakter khusus di local part
+    const localPart = email.split('@')[0];
+    if (localPart.startsWith('.') || localPart.endsWith('.') || localPart.includes('..')) {
+      return { isValid: false, message: 'Format email tidak valid (tidak boleh mengandung titik berurutan atau diawali/diakhiri dengan titik)' };
+    }
+
+    // Validasi panjang bagian local
+    if (localPart.length > 64) {
+      return { isValid: false, message: 'Bagian sebelum @ terlalu panjang (maksimal 64 karakter)' };
+    }
+
+    // Daftar domain email yang tidak diizinkan
+    const blockedDomains = [
+      'tempmail.com',
+      'temp-mail.org',
+      'disposablemail.com',
+      'throwawaymail.com',
+      'fakeinbox.com',
+      'guerrillamail.com',
+      'sharklasers.com',
+      'spam4.me',
+      'mailinator.com',
+      'yopmail.com'
+    ];
+
+    // Cek domain yang diblokir
+    const domain = email.split('@')[1].toLowerCase();
+    if (blockedDomains.some(blockedDomain => domain.includes(blockedDomain))) {
+      return { isValid: false, message: 'Mohon gunakan email pribadi Anda. Email sementara tidak diizinkan untuk pendaftaran' };
+    }
+
+    return { isValid: true, message: '' };
+  }
+
+  // Fungsi untuk mengecek data yang sudah ada
+  async function checkExisting(field: string, value: string) {
+    const response = await fetch('/api/check-existing', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ field, value })
+    });
+    const data = await response.json();
+    return data.exists;
+  }
+
   async function handleRegister() {
     try {
+      // Validasi password
       if (password !== confirmPassword) {
         throw new Error('Password tidak cocok');
       }
 
-      loading = true;
-
-      // Cek apakah username sudah dipakai
-      const { data: existingUser, error: checkError } = await supabaseClient
-        .from('users')
-        .select('username')
-        .eq('username', username)
-        .single();
-
-      if (existingUser) {
-        throw new Error('Username sudah digunakan');
+      // Validasi email
+      const emailValidation = isValidEmail(email);
+      if (!emailValidation.isValid) {
+        throw new Error(emailValidation.message);
       }
 
-      // Register dengan Supabase Auth
-      const { data, error } = await supabaseClient.auth.signUp({
-        email: email,
-        password: password,
-        options: {
-          data: {
-            username,
-            phone,
-            birth_date
-          }
-        }
+      loading = true;
+
+      // Cek apakah nomor telepon sudah terdaftar
+      const phoneExists = await checkExisting('phone', phone);
+      if (phoneExists) {
+        throw new Error('Nomor telepon tersebut sudah terdaftar');
+      }
+
+      // Cek apakah email sudah terdaftar
+      const emailExists = await checkExisting('email', email);
+      if (emailExists) {
+        throw new Error('Email tersebut sudah terdaftar');
+      }
+
+      // Cek apakah username sudah dipakai
+      const usernameExists = await checkExisting('username', username);
+      if (usernameExists) {
+        throw new Error('Username ini sudah digunakan. Silakan pilih username lain');
+      }
+
+      // Kirim data registrasi
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          username,
+          phone,
+          birth_date
+        })
       });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      // Insert ke tabel users
-      const { error: insertError } = await supabaseClient
-        .from('users')
-        .insert({
-          id: data.user?.id,
-          username,
-          email,
-          phone,
-          birth_date,
-          auth_uid: data.user?.id
-        });
-
-      if (insertError) throw insertError;
+      if (!response.ok) {
+        throw { 
+          message: result.error,
+          code: result.code
+        };
+      }
 
       // Tampilkan popup sukses
       await Swal.fire({
@@ -76,17 +149,70 @@
         }
       });
 
-    } catch (error) {
-      console.error('Error:', error);
+    } catch (err) {
+      console.error('Error:', err);
+      let errorMessage = err.message;
+
+      // Jika error dari Supabase Auth
+      if (err.code) {
+        errorMessage = translateSupabaseError({
+          code: err.code,
+          message: err.message
+        });
+      }
+
       await Swal.fire({
         title: 'Error!',
-        text: error.message || 'Gagal mendaftar',
+        text: errorMessage,
         icon: 'error',
-        confirmButtonColor: '#e62020'
+        confirmButtonColor: '#e62020',
+        confirmButtonText: 'OK'
       });
     } finally {
       loading = false;
     }
+  }
+
+  // Fungsi untuk menerjemahkan pesan error Supabase
+  function translateSupabaseError(error: any) {
+    const errorCode = error?.code;
+    const errorMessage = error?.message;
+
+    // Daftar pesan error dalam bahasa Indonesia
+    const errorMessages: { [key: string]: string } = {
+      'email_address_invalid': 'Alamat email tidak aktif, mohon gunakan email aktif',
+      'invalid_email': 'Alamat email tidak valid, mohon periksa kembali',
+      'email_taken': 'Email sudah terdaftar, silakan gunakan email lain',
+      'user_exists': 'Pengguna sudah terdaftar',
+      'weak_password': 'Password terlalu lemah, gunakan minimal 8 karakter',
+      'passwordless_signup_not_allowed': 'Pendaftaran tanpa password tidak diizinkan',
+      'unauthenticated': 'Silakan login terlebih dahulu',
+      'unauthorized': 'Anda tidak memiliki akses',
+      '23505': 'Nomor telepon tersebut sudah terdaftar',
+      'default': 'Terjadi kesalahan, silakan coba lagi'
+    };
+
+    // Jika ada kode error spesifik
+    if (errorCode && errorMessages[errorCode]) {
+      return errorMessages[errorCode];
+    }
+
+    // Jika error berkaitan dengan unique constraint users_phone_key
+    if (errorMessage && typeof errorMessage === 'string' &&
+        errorMessage.includes('users_phone_key')) {
+      return 'Nomor telepon tersebut sudah terdaftar';
+    }
+
+    // Jika error berkaitan dengan email invalid
+    if (errorMessage && typeof errorMessage === 'string') {
+      if (errorMessage.toLowerCase().includes('email address') && 
+          errorMessage.toLowerCase().includes('is invalid')) {
+        return errorMessages['email_address_invalid'];
+      }
+    }
+
+    // Error default
+    return errorMessages.default;
   }
 </script>
 
