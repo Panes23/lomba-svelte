@@ -166,7 +166,7 @@
           <div class="space-y-3">
             {#each markets as market}
               <a 
-                href={getFullUrl(`/lomba/${encodeURIComponent(market.name.toLowerCase())}`)}
+                href={getFullUrl(`/lomba/${encodeURIComponent(market.name)}`)}
                 class="group flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-300"
               >
                 <svg class="w-4 h-4 text-gray-500 group-hover:text-[#e62020] transition-colors duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
