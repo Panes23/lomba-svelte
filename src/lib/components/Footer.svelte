@@ -142,6 +142,7 @@
           <a href="/privacy" class="text-gray-400 hover:text-white text-sm">Privacy Policy</a>
           <a href="/terms" class="text-gray-400 hover:text-white text-sm">Terms of Service</a>
           <a href="/cookies" class="text-gray-400 hover:text-white text-sm">Cookie Policy</a>
+          <a href="/sitemap" class="text-gray-400 hover:text-white text-sm">Sitemap</a>
         </div>
       </div>
     </div>

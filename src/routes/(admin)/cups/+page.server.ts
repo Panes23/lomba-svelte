@@ -16,10 +16,10 @@ function getDateRange(period: string) {
       start.setDate(start.getDate() - 7); // 7 hari terakhir
       break;
     case 'monthly':
-      start.setMonth(start.getMonth() - 6); // 6 bulan terakhir
+      start.setMonth(start.getMonth() - 12); // 12 bulan terakhir
       break;
     case 'yearly':
-      start.setFullYear(start.getFullYear() - 1); // 1 tahun terakhir
+      start.setFullYear(start.getFullYear() - 5); // 5 tahun terakhir
       break;
     default:
       start.setDate(start.getDate() - 7);
@@ -63,10 +63,10 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
       supabaseAdmin.from('user_online').select('*', { count: 'exact', head: true })
         .gte('updated_at', today.toISOString()),
       supabaseAdmin.from('user_online')
-        .select('username, updated_at')
-        .gte('updated_at', start)
-        .lte('updated_at', end)
-        .order('updated_at', { ascending: true })
+        .select('username, created_at')
+        .gte('created_at', start)
+        .lte('created_at', end)
+        .order('created_at', { ascending: true })
     ]);
 
     if (totalError) throw totalError;
@@ -77,15 +77,15 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 
     // Proses data untuk chart
     const processedChartData = chartData?.reduce((acc: any, curr: any) => {
-      const date = new Date(curr.updated_at);
+      const date = new Date(curr.created_at);
       let key = '';
       
       switch(period) {
         case 'daily':
-          key = date.toLocaleDateString();
+          key = date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
           break;
         case 'monthly':
-          key = date.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+          key = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
           break;
         case 'yearly':
           key = date.toLocaleDateString('id-ID', { year: 'numeric' });

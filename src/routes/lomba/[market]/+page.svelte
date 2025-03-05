@@ -10,7 +10,7 @@
 
   export let data;
   // State untuk filter tanggal
-  let selectedDate = formatDateForInput(new Date());
+  let selectedDate = '';  // Default kosong untuk menampilkan semua lomba
   
   $: ({ market, lomba } = data);
 
@@ -21,11 +21,65 @@
   let guessNumber = '';
   let submitting = false;
 
-  // Filter lomba berdasarkan tanggal
-  $: filteredLomba = lomba.filter(item => {
-    if (!selectedDate) return true;
-    return item.tanggal === selectedDate;
-  });
+  // Filter dan urutkan lomba berdasarkan tanggal
+  $: filteredLomba = Array.isArray(lomba) ? lomba
+    .filter(item => {
+      if (!selectedDate) return true; // Tampilkan semua jika tidak ada filter
+      return item.tanggal === selectedDate;
+    })
+    .sort((a, b) => {
+      // Urutkan berdasarkan tanggal terbaru
+      const dateA = new Date(a.tanggal);
+      const dateB = new Date(b.tanggal);
+      return dateB.getTime() - dateA.getTime();
+    }) : [];
+
+  // Pagination
+  let currentPage = 1;
+  const itemsPerPage = 12;
+
+  // Hitung total halaman
+  $: totalPages = Math.ceil(filteredLomba.length / itemsPerPage);
+
+  // Get items untuk halaman saat ini
+  $: paginatedLomba = filteredLomba.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Fungsi untuk navigasi halaman
+  function goToPage(page: number) {
+    if (page >= 1 && page <= totalPages) {
+      currentPage = page;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  // Reset halaman saat filter berubah
+  $: if (selectedDate) {
+    currentPage = 1;
+  }
+
+  // Generate array angka halaman yang akan ditampilkan
+  $: pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+  // Format tanggal untuk ditampilkan
+  function formatDisplayDate(dateString: string) {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      return date.toLocaleDateString('id-ID', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch (err) {
+      console.error('Error formatting date:', err);
+      return dateString;
+    }
+  }
 
   // Reactive statement untuk status
   $: status = market ? getMarketStatus(market) : null;
@@ -44,9 +98,24 @@
   // Fungsi untuk memperbarui data lomba
   async function refreshLomba() {
     try {
-      const response = await fetch(`/api/lomba/${market.id}?date=${selectedDate}`);
+      if (!market?.id) {
+        console.error('Market ID tidak tersedia');
+        return;
+      }
+
+      // Hanya kirim parameter date jika ada filter tanggal
+      const url = selectedDate 
+        ? `/api/lomba/${market.id}?date=${selectedDate}`
+        : `/api/lomba/${market.id}`;
+        
+      console.log('Fetching lomba from:', url);
+      
+      const response = await fetch(url);
       const data = await response.json();
+      
       if (!response.ok) throw new Error(data.error);
+      
+      console.log('Received lomba data:', data);
       lomba = data;
     } catch (err) {
       console.error('Error refreshing lomba:', err);
@@ -166,160 +235,208 @@
     {error}
   </div>
 {:else if market}
-  <div class="min-h-screen bg-[#1a1a1a] pt-24 pb-16">
+  <div class="min-h-screen bg-[#1a1a1a] pt-16 pb-16">
     <div class="container mx-auto px-4">
       <!-- Header Section -->
-      <div class="relative mb-16">
-        <!-- Decorative Background -->
+      <div class="relative mb-8">
         <div class="absolute inset-0 bg-gradient-to-b from-[#e62020]/5 to-transparent" />
-        <div class="absolute -top-20 left-1/2 w-full max-w-[500px] aspect-square bg-[#e62020]/5 rounded-full blur-3xl transform -translate-x-1/2" />
-      
-        <div class="relative container mx-auto px-4 pt-8 pb-12 overflow-hidden">
-          <div class="relative mx-auto mb-8 h-40 w-40 overflow-hidden rounded-full border-4 border-[#e62020]/20">
-            <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/20 to-transparent blur-xl" />
-            <img
-              src={market.image}
-              alt={market.name}
-              class="relative h-full w-full object-cover transform hover:scale-110 transition-transform duration-500"
-            />
-          </div>
-          
-          <h1 class="mb-6 text-center text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
-            {market.name}
-          </h1>
-
-          <!-- Market Status -->
-          {#if market}
-            <div class="mb-6 md:mb-8 flex justify-center">
-              <div class="flex items-center gap-2 rounded-lg {status.bg} {status.border} border px-4 py-2">
-                <span class="h-2 w-2 rounded-full animate-pulse" class:bg-yellow-400={status.text === 'BELUM DIMULAI'} class:bg-green-400={status.text === 'BUKA'} class:bg-red-400={status.text === 'TUTUP'}></span>
-                <span class="{status.color} font-medium">{status.text}</span>
+        
+        <div class="relative flex flex-col md:flex-row items-center justify-between gap-8 p-4 pt-10 md:p-8">
+          <!-- Market Info -->
+          <div class="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 flex-1">
+            <div class="relative h-20 w-20 sm:h-24 sm:w-24 md:h-32 md:w-32 flex-shrink-0 overflow-hidden rounded-full border-4 border-[#e62020]/20">
+              <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/20 to-transparent blur-xl" />
+              <img
+                src={market.image}
+                alt={market.name}
+                class="relative h-full w-full object-cover transform hover:scale-110 transition-transform duration-500"
+              />
+            </div>
+            
+            <div class="text-center sm:text-left">
+              <h1 class="text-xl sm:text-2xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
+                {market.name}
+              </h1>
+              
+              <!-- Market Status -->
+              <div class="mt-3">
+                <div class="inline-flex items-center gap-2 rounded-lg {status.bg} {status.border} border px-3 py-1.5 sm:px-4 sm:py-2">
+                  <span class="h-2 w-2 rounded-full animate-pulse" class:bg-yellow-400={status.text === 'BELUM DIMULAI'} class:bg-green-400={status.text === 'BUKA'} class:bg-red-400={status.text === 'TUTUP'}></span>
+                  <span class="{status.color} font-medium text-sm sm:text-base">{status.text}</span>
+                </div>
               </div>
             </div>
-          {/if}
-
-          <!-- Market Schedule -->
-          <div class="mx-auto flex max-w-sm justify-center gap-6 md:gap-12 text-center">
-            <div>
-              <p class="text-sm font-medium uppercase tracking-wider text-gray-400 mb-2">Jam Buka</p>
-              <p class="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.buka}</p>
-            </div>
-            <div>
-              <p class="text-sm font-medium uppercase tracking-wider text-gray-400 mb-2">Jam Tutup</p>
-              <p class="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.tutup}</p>
-            </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Filter Section -->
-      <div class="mb-12">
-        <div class="mx-auto max-w-md px-4">
-          <div class="flex items-center gap-4 rounded-lg bg-[#222] p-4">
-            <label class="text-xs md:text-sm font-medium uppercase tracking-wider text-gray-400">Pilih Tanggal:</label>
-            <input
-              type="date"
-              bind:value={selectedDate}
-              on:change={refreshLomba}
-              class="flex-1 rounded-lg bg-[#1a1a1a] px-3 md:px-4 py-2 md:py-3 text-sm md:text-base text-white border border-gray-800 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent transition-all duration-300"
-            />
+          <!-- Schedule & Filter -->
+          <div class="flex flex-col md:flex-row items-center gap-4 md:gap-6 w-full md:w-auto">
+            <!-- Market Schedule -->
+            <div class="flex gap-6 md:gap-8 items-center w-full md:w-auto justify-center md:justify-start">
+              <div class="text-center">
+                <p class="text-xs font-medium uppercase tracking-wider text-gray-400">Jam Buka</p>
+                <p class="text-lg sm:text-xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.buka}</p>
+              </div>
+              <div class="text-center">
+                <p class="text-xs font-medium uppercase tracking-wider text-gray-400">Jam Tutup</p>
+                <p class="text-lg sm:text-xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">{market.tutup}</p>
+              </div>
+            </div>
+
+            <!-- Filter -->
+            <div class="w-full md:w-auto">
+              <div class="flex flex-col sm:flex-row items-center gap-3 rounded-lg bg-[#222] p-4 w-full">
+                <label class="text-xs font-medium uppercase tracking-wider text-gray-400 whitespace-nowrap w-full sm:w-auto text-center sm:text-left">Pilih Tanggal:</label>
+                <input
+                  type="date"
+                  bind:value={selectedDate}
+                  on:change={refreshLomba}
+                  class="w-full rounded-lg bg-[#1a1a1a] px-3 py-2 text-sm text-white border border-gray-800 focus:outline-none focus:ring-2 focus:ring-[#e62020] focus:border-transparent transition-all duration-300"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Lomba Cards -->
       {#if filteredLomba.length > 0}
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 container mx-auto px-4">
-          {#each filteredLomba as item}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 container mx-auto">
+          {#each paginatedLomba as item}
             {@const lombaId = item.id}
-            <div class="group relative overflow-hidden rounded-xl border border-gray-800/50 bg-gradient-to-br from-[#1a1a1a] to-[#222] p-6 hover:border-[#e62020]/30 transition-all duration-300 shadow-xl shadow-black/20 backdrop-blur-sm">
-              <!-- Decorative Elements -->
-              <div class="absolute inset-0 bg-gradient-to-br from-[#e62020]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div class="absolute -right-32 -top-32 h-64 w-64 rounded-full bg-[#e62020]/5 blur-3xl group-hover:bg-[#e62020]/10 transition-all duration-500" />
-              
+            <div class="group relative overflow-hidden rounded-xl border border-gray-800/50 bg-gradient-to-br from-[#1a1a1a] to-[#222] hover:border-[#e62020]/30 transition-all duration-300 shadow-xl shadow-black/20 backdrop-blur-sm">
               <!-- Badge -->
               <div class="absolute right-0 top-0 rounded-bl-xl bg-gradient-to-r from-[#e62020] to-[#ff0000] px-4 py-2 text-sm font-semibold text-white shadow-lg">
                 {item.guess_type}
               </div>
 
               <!-- Content -->
-              <div class="space-y-4">
+              <div class="p-4 space-y-3">
                 <div>
-                  <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Tanggal</p>
-                  <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">
-                    {new Date(item.tanggal).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  <p class="text-xs font-medium uppercase tracking-wider text-gray-400">Tanggal</p>
+                  <p class="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">
+                    {formatDisplayDate(item.tanggal)}
                   </p>
                 </div>
 
                 <div>
-                  <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Hadiah</p>
-                  <p class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#e62020] to-[#ff0000]">
+                  <p class="text-xs font-medium uppercase tracking-wider text-gray-400">Hadiah</p>
+                  <p class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#e62020] to-[#ff0000]">
                     Rp {item.prize_pool.toLocaleString('id-ID')}
                   </p>
                 </div>
 
-                <div>
-                  <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Total Pemenang</p>
-                  <p class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">
-                    {item.max_winner} orang
-                  </p>
+                <div class="flex justify-between items-center">
+                  <div>
+                    <p class="text-xs font-medium uppercase tracking-wider text-gray-400">Pemenang</p>
+                    <p class="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-300">
+                      {item.max_winner} orang
+                    </p>
+                  </div>
+
+                  {#if item.result !== ""}
+                    <div class="text-right">
+                      <p class="text-xs font-medium uppercase tracking-wider text-gray-400">Hasil</p>
+                      <p class="text-xl font-bold text-green-400">{item.result}</p>
+                    </div>
+                  {:else}
+                    <div class="text-right">
+                      <p class="text-xs font-medium uppercase tracking-wider text-gray-400">Status</p>
+                      <p class="text-sm font-medium text-yellow-500">Belum Result</p>
+                    </div>
+                  {/if}
                 </div>
 
-                {#if item.result !== ""}
-                  <div>
-                    <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Hasil</p>
-                    <p class="text-3xl font-bold text-green-400">{item.result}</p>
-                  </div>
-                {:else}
-                  <div>
-                    <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1 mt-6">Hasil</p>
-                    <p class="text-lg font-medium text-yellow-500">Belum Result</p>
-                  </div>
-                {/if}
+                <!-- Tombol -->
+                <a
+                  href="/tebakan/{lombaId}"
+                  class={`
+                    mt-3 block w-full transform rounded-lg px-4 py-2.5 text-center font-semibold 
+                    text-white transition-all duration-300 relative overflow-hidden
+                    ${item.result === "" && getMarketStatus(market).text === 'BUKA' 
+                      ? 'bg-gradient-to-r from-[#e62020] to-[#ff0000] hover:from-[#ff0000] hover:to-[#e62020] before:absolute before:inset-0 before:border-2 before:border-white/20 before:rounded-lg before:animate-pulse-border'
+                      : 'bg-gradient-to-r from-[#e62020] to-[#ff0000] hover:from-[#ff0000] hover:to-[#e62020]'
+                    }
+                    hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#e62020]/20 
+                    group
+                  `}
+                >
+                  <span class="relative z-10 inline-flex items-center gap-2 text-sm">
+                    {item.result !== "" || getMarketStatus(market).text !== 'BUKA' 
+                      ? 'Detail Lomba' 
+                      : 'Ikuti Lomba'
+                    }
+                    {#if item.result === "" && getMarketStatus(market).text === 'BUKA'}
+                      <svg 
+                        class="w-4 h-4 animate-bounce-right" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path 
+                          stroke-linecap="round" 
+                          stroke-linejoin="round" 
+                          stroke-width="2" 
+                          d="M13 7l5 5m0 0l-5 5m5-5H6"
+                        />
+                      </svg>
+                    {/if}
+                  </span>
+                </a>
               </div>
-
-              <!-- Tombol Ikuti Lomba -->
-              <a
-                href="/tebakan/{lombaId}"
-                class={`
-                  mt-6 block w-full transform rounded-lg px-4 py-3 text-center font-semibold 
-                  text-white transition-all duration-300 relative overflow-hidden
-                  ${item.result === "" && getMarketStatus(market).text === 'BUKA' 
-                    ? 'bg-gradient-to-r from-[#e62020] to-[#ff0000] hover:from-[#ff0000] hover:to-[#e62020] before:absolute before:inset-0 before:border-2 before:border-white/20 before:rounded-lg before:animate-pulse-border after:absolute after:inset-0 after:bg-gradient-to-r after:from-white/10 after:to-transparent after:animate-shine after:-translate-x-full hover:after:translate-x-full after:transition-transform after:duration-1000'
-                    : 'bg-gradient-to-r from-[#e62020] to-[#ff0000] hover:from-[#ff0000] hover:to-[#e62020]'
-                  }
-                  hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#e62020]/20 
-                  group
-                `}
-              >
-                <span class="relative z-10 inline-flex items-center gap-2">
-                  {item.result !== "" || getMarketStatus(market).text !== 'BUKA' 
-                    ? 'Detail Lomba' 
-                    : 'Ikuti Lomba'
-                  }
-                  {#if item.result === "" && getMarketStatus(market).text === 'BUKA'}
-                    <svg 
-                      class="w-4 h-4 animate-bounce-right" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
-                      stroke="currentColor"
-                    >
-                      <path 
-                        stroke-linecap="round" 
-                        stroke-linejoin="round" 
-                        stroke-width="2" 
-                        d="M13 7l5 5m0 0l-5 5m5-5H6"
-                      />
-                    </svg>
-                  {/if}
-                </span>
-              </a>
             </div>
           {/each}
         </div>
+
+        <!-- Pagination Navigation -->
+        {#if totalPages > 1}
+          <div class="flex justify-center items-center mt-8 gap-2">
+            <!-- Previous Button -->
+            <button
+              class="px-3 py-2 rounded-lg bg-[#222] text-gray-400 hover:text-white hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+              disabled={currentPage === 1}
+              on:click={() => goToPage(currentPage - 1)}
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            <!-- Page Numbers -->
+            {#each pageNumbers as pageNum}
+              <button
+                class="px-4 py-2 rounded-lg transition-all duration-300 {currentPage === pageNum 
+                  ? 'bg-gradient-to-r from-[#e62020] to-[#ff0000] text-white' 
+                  : 'bg-[#222] text-gray-400 hover:text-white hover:bg-[#333]'}"
+                on:click={() => goToPage(pageNum)}
+              >
+                {pageNum}
+              </button>
+            {/each}
+
+            <!-- Next Button -->
+            <button
+              class="px-3 py-2 rounded-lg bg-[#222] text-gray-400 hover:text-white hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+              disabled={currentPage === totalPages}
+              on:click={() => goToPage(currentPage + 1)}
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Page Info -->
+          <div class="text-center mt-4 text-sm text-gray-400">
+            Halaman {currentPage} dari {totalPages}
+          </div>
+        {/if}
       {:else}
-        <div class="text-center text-gray-400">
-          Belum ada lomba tersedia untuk tanggal {new Date(selectedDate).toLocaleDateString('id-ID')}
+        <div class="text-center space-y-4">
+          <div class="text-gray-400">
+            {selectedDate 
+              ? `Belum ada lomba tersedia untuk tanggal ${formatDisplayDate(selectedDate)}`
+              : 'Belum ada lomba tersedia'}
+          </div>
         </div>
       {/if}
     </div>

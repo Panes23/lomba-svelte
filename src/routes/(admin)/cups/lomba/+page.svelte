@@ -64,15 +64,18 @@
   onMount(async () => {
     try {
       const [marketsResponse, websitesResponse] = await Promise.all([
-        supabaseClient.from('markets').select('*'),
-        supabaseClient.from('websites').select('*')
+        fetch('/api/markets'),
+        fetch('/api/websites')
       ]);
 
-      if (marketsResponse.error) throw marketsResponse.error;
-      if (websitesResponse.error) throw websitesResponse.error;
+      if (!marketsResponse.ok) throw new Error('Failed to fetch markets');
+      if (!websitesResponse.ok) throw new Error('Failed to fetch websites');
 
-      markets = marketsResponse.data;
-      websites = websitesResponse.data;
+      const marketsData = await marketsResponse.json();
+      const websitesData = await websitesResponse.json();
+
+      markets = marketsData;
+      websites = websitesData;
 
       // Update jumlah peserta untuk setiap lomba
       if (lomba) {
@@ -99,19 +102,14 @@
   async function fetchAvailableFakeUsers(lombaId: string) {
     try {
       // Ambil semua fake users beserta website mereka
-      const { data: allFakeUsers, error: fakeUsersError } = await supabaseClient
-        .from('fake_users')
-        .select('userid_website, website_id');
+      const response = await fetch('/api/fake-users');
+      if (!response.ok) throw new Error('Failed to fetch fake users');
+      const allFakeUsers = await response.json();
       
-      if (fakeUsersError) throw fakeUsersError;
-
       // Ambil tebakan yang sudah ada untuk lomba ini
-      const { data: existingGuesses, error: guessesError } = await supabaseClient
-        .from('tebakan')
-        .select('userid_website, website_id')
-        .eq('lomba_id', lombaId);
-
-      if (guessesError) throw guessesError;
+      const tebakanResponse = await fetch(`/api/tebakan?lomba_id=${lombaId}`);
+      if (!tebakanResponse.ok) throw new Error('Failed to fetch tebakan');
+      const existingGuesses = await tebakanResponse.json();
 
       // Buat Set untuk menyimpan userid_website yang sudah menebak
       const usedUserIds = new Set(
@@ -233,12 +231,10 @@
   // Fetch jumlah peserta untuk setiap lomba
   async function fetchJumlahPeserta(lombaId: string) {
     try {
-      const { data, error } = await supabaseClient
-        .from('tebakan')
-        .select('userid_website')
-        .eq('lomba_id', lombaId);
-
-      if (error) throw error;
+      const response = await fetch(`/api/tebakan?lomba_id=${lombaId}`);
+      if (!response.ok) throw new Error('Failed to fetch tebakan');
+      
+      const data = await response.json();
       return data?.length || 0;
     } catch (error) {
       console.error('Error:', error);
@@ -763,14 +759,14 @@
       return { ...item, status, order, minutesUntilClose };
     })
     .filter(item => {
-      const matchesSearch = (
-        item.guess_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.result?.toString().includes(searchQuery) ||
-        item.markets?.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      
-      const matchesDate = !selectedDate || item.tanggal.startsWith(selectedDate);
-      
+    const matchesSearch = (
+      item.guess_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.result?.toString().includes(searchQuery) ||
+      item.markets?.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    
+    const matchesDate = !selectedDate || item.tanggal.startsWith(selectedDate);
+    
       const matchesStatus = selectedStatus === 'Semua' || item.status === selectedStatus;
       
       return matchesSearch && matchesDate && matchesStatus;
@@ -810,28 +806,16 @@
   async function fetchGuesses(lombaId: string) {
     try {
       loadingGuesses = true;
-      const { data: guessData, error: guessError } = await supabaseClient
-        .from('tebakan')
-        .select(`
-          userid_website,
-          number,
-          created_at,
-          website_id,
-          websites (
-            nama
-          )
-        `)
-        .eq('lomba_id', lombaId)
-        .order('created_at', { ascending: true });
-
-      if (guessError) throw guessError;
+      
+      // Fetch tebakan details
+      const tebakanResponse = await fetch(`/api/tebakan/view?lomba_id=${lombaId}`);
+      if (!tebakanResponse.ok) throw new Error('Failed to fetch tebakan details');
+      const guessData = await tebakanResponse.json();
 
       // Fetch fake users untuk pengecekan
-      const { data: fakeUsers, error: fakeError } = await supabaseClient
-        .from('fake_users')
-        .select('userid_website, website_id');
-
-      if (fakeError) throw fakeError;
+      const fakeUsersResponse = await fetch('/api/fake-users');
+      if (!fakeUsersResponse.ok) throw new Error('Failed to fetch fake users');
+      const fakeUsers = await fakeUsersResponse.json();
 
       // Buat Set untuk menyimpan fake user IDs
       const fakeUserSet = new Set(
@@ -982,9 +966,14 @@
   // Fungsi untuk membuka modal winner
   async function openWinnerModal(lomba: any) {
     try {
+      loadingWinners = true;
       selectedLomba = lomba;
       showWinnerModal = true;
-      selectedWinners = await findWinners(lomba);
+
+      const response = await fetch(`/api/tebakan/winners?lomba_id=${lomba.id}`);
+      if (!response.ok) throw new Error('Failed to fetch winners');
+      
+      selectedWinners = await response.json();
     } catch (error) {
       console.error('Error:', error);
       await Swal.fire({
@@ -1060,6 +1049,65 @@
     } finally {
       loading = false;
     }
+  }
+
+  // Fungsi untuk mengkonversi data pemenang ke format txt
+  function downloadTxt() {
+    let content = `=================================================\n`;
+    content += `           DAFTAR PEMENANG LOMBA\n`;
+    content += `=================================================\n\n`;
+    content += `Pasaran     : ${selectedLomba?.markets?.name}\n`;
+    content += `Tipe        : ${selectedLomba?.guess_type}\n`;
+    content += `Tanggal     : ${formatDate(selectedLomba?.tanggal)}\n`;
+    content += `Result      : ${selectedLomba?.result}\n\n`;
+    
+    selectedWinners.forEach((winner, index) => {
+      content += `-------------------------------------------------\n`;
+      content += `PEMENANG #${index + 1}\n`;
+      content += `-------------------------------------------------\n`;
+      content += `Website      : ${winner.websites?.nama || '-'}\n`;
+      content += `User ID      : ${winner.userid_website}\n`;
+      content += `Status       : ${winner.isFake ? 'Fake' : 'Real'}\n`;
+      content += `No. Tebakan  : ${winner.number}\n`;
+      content += `Angka Cocok  : ${winner.matchingPart}\n`;
+      content += `Waktu Tebak  : ${new Date(winner.created_at).toLocaleString('id-ID')}\n`;
+      content += `=================================================\n\n`;
+    });
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pemenang_${selectedLomba?.markets?.name}_${selectedLomba?.tanggal}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Fungsi untuk mengkonversi data pemenang ke format csv
+  function downloadCsv() {
+    let content = `Peringkat,Website,User ID,Status,Nomor Tebakan,Angka Cocok,Waktu Tebak\n`;
+    
+    selectedWinners.forEach((winner, index) => {
+      content += `${index + 1},`;
+      content += `"${winner.websites?.nama || '-'}",`;
+      content += `"${winner.userid_website}",`;
+      content += `${winner.isFake ? 'Fake' : 'Real'},`;
+      content += `"${winner.number}",`;
+      content += `"${winner.matchingPart}",`;
+      content += `"${new Date(winner.created_at).toLocaleString('id-ID')}"\n`;
+    });
+
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pemenang_${selectedLomba?.markets?.name}_${selectedLomba?.tanggal}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   }
 </script>
 
@@ -1886,9 +1934,33 @@
       <div class="bg-[#222] rounded-xl w-full max-w-5xl">
         <div class="p-6">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-bold text-white">
-              Daftar Pemenang - {selectedLomba?.markets?.name} ({selectedLomba?.guess_type})
-            </h2>
+            <div class="flex items-center gap-4">
+              <h2 class="text-xl font-bold text-white">
+                Daftar Pemenang - {selectedLomba?.markets?.name} ({selectedLomba?.guess_type})
+              </h2>
+              {#if selectedWinners.length > 0}
+                <div class="flex gap-2">
+                  <button
+                    on:click={downloadTxt}
+                    class="px-3 py-1 bg-[#2a2a2a] text-gray-300 rounded-lg hover:bg-[#333] transition-colors text-sm flex items-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    TXT
+                  </button>
+                  <button
+                    on:click={downloadCsv}
+                    class="px-3 py-1 bg-[#2a2a2a] text-gray-300 rounded-lg hover:bg-[#333] transition-colors text-sm flex items-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    CSV
+                  </button>
+                </div>
+              {/if}
+            </div>
             <button
               on:click={() => {
                 showWinnerModal = false;

@@ -5,8 +5,8 @@ import type { RequestHandler } from './$types';
 export const GET: RequestHandler = async () => {
   try {
     const { data, error } = await supabaseClient
-      .from('markets')
-      .select('*');
+      .from('fake_users')
+      .select('userid_website, website_id');
 
     if (error) throw error;
 
@@ -18,7 +18,7 @@ export const GET: RequestHandler = async () => {
       }
     });
   } catch (err) {
-    console.error('Error fetching markets:', err);
-    return json({ error: 'Failed to fetch markets' }, { status: 500 });
+    console.error('Error fetching fake users:', err);
+    return json({ error: 'Failed to fetch fake users' }, { status: 500 });
   }
 }; 

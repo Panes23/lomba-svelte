@@ -1,14 +1,81 @@
 <script>
   import { onMount } from 'svelte';
+  import { tweened } from 'svelte/motion';
+  import { cubicOut } from 'svelte/easing';
+  import { browser } from '$app/environment';
 
   const baseUrl = import.meta.env.VITE_BASE_URL;
 
   const stats = [
-    { number: "10K+", label: "Pengguna Aktif" },
-    { number: "6+", label: "Pasaran Tersedia" },
-    { number: "24/7", label: "Layanan Support" },
-    { number: "100%", label: "Pembayaran Aman" }
+    { number: 10000, label: "Pengguna Aktif", suffix: "+" },
+    { number: 54, label: "Pasaran Tersedia", suffix: "+" },
+    { number: 24, label: "Layanan Support", suffix: "/7" },
+    { number: 100, label: "Pembayaran Aman", suffix: "%" }
   ];
+
+  // Deklarasi store di level atas dengan konfigurasi yang lebih detail
+  const count1 = tweened(0, {
+    duration: 2000,
+    easing: cubicOut,
+    interpolate: (a, b) => (t) => Math.round(a + (b - a) * t) // Memastikan nilai selalu bulat
+  });
+  const count2 = tweened(0, {
+    duration: 2000,
+    easing: cubicOut,
+    interpolate: (a, b) => (t) => Math.round(a + (b - a) * t)
+  });
+  const count3 = tweened(0, {
+    duration: 2000,
+    easing: cubicOut,
+    interpolate: (a, b) => (t) => Math.round(a + (b - a) * t)
+  });
+  const count4 = tweened(0, {
+    duration: 2000,
+    easing: cubicOut,
+    interpolate: (a, b) => (t) => Math.round(a + (b - a) * t)
+  });
+
+  let visible = false;
+  let hasAnimated = false;
+
+  // Reset counters to 0 when component is created
+  if (browser) {
+    count1.set(0, { duration: 0 });
+    count2.set(0, { duration: 0 });
+    count3.set(0, { duration: 0 });
+    count4.set(0, { duration: 0 });
+  }
+  
+  function startAnimation() {
+    if (!hasAnimated && browser) {
+      visible = true;
+      hasAnimated = true;
+      
+      // Mulai animasi dengan sedikit delay dan durasi yang berbeda berdasarkan nilai target
+      setTimeout(() => {
+        count1.set(stats[0].number, { duration: 2000 });
+        count2.set(stats[1].number, { duration: 1500 });
+        count3.set(stats[2].number, { duration: 1200 });
+        count4.set(stats[3].number, { duration: 1800 });
+      }, 100);
+    }
+  }
+
+  onMount(() => {
+    // Trigger animation when component is mounted
+    startAnimation();
+    
+    // Reset state when component is destroyed
+    return () => {
+      hasAnimated = false;
+      visible = false;
+    };
+  });
+
+  // Format number dengan pemisah ribuan
+  function formatNumber(num) {
+    return num.toLocaleString('id-ID');
+  }
 
   const teams = [
     {
@@ -27,12 +94,6 @@
       icon: "M2.25 8.25h19.5M2.25 9h19.5m-16.5 13.5h13.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H5.25a2.25 2.25 0 00-2.25 2.25v13.5a2.25 2.25 0 002.25 2.25z"
     }
   ];
-
-  let visible = false;
-  
-  onMount(() => {
-    visible = true;
-  });
 </script>
 
 <svelte:head>
@@ -82,17 +143,51 @@
       </p>
     </div>
 
-    <!-- Stats -->
+    <!-- Stats dengan animasi counting -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
-      {#each stats as stat, i}
-        <div 
-          class="text-center p-6 bg-[#222] rounded-lg {visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} transition-all duration-700"
-          style="transition-delay: {i * 100}ms"
-        >
-          <div class="text-3xl font-bold text-[#e62020] mb-2">{stat.number}</div>
-          <div class="text-gray-400">{stat.label}</div>
+      <div class="text-center p-6 bg-[#222] rounded-lg {visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} transition-all duration-700" style="transition-delay: 0ms">
+        <div class="text-3xl font-bold text-[#e62020] mb-2">
+          {#if visible}
+            {formatNumber($count1)}{stats[0].suffix}
+          {:else}
+            0{stats[0].suffix}
+          {/if}
         </div>
-      {/each}
+        <div class="text-gray-400">{stats[0].label}</div>
+      </div>
+
+      <div class="text-center p-6 bg-[#222] rounded-lg {visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} transition-all duration-700" style="transition-delay: 100ms">
+        <div class="text-3xl font-bold text-[#e62020] mb-2">
+          {#if visible}
+            {formatNumber($count2)}{stats[1].suffix}
+          {:else}
+            0{stats[1].suffix}
+          {/if}
+        </div>
+        <div class="text-gray-400">{stats[1].label}</div>
+      </div>
+
+      <div class="text-center p-6 bg-[#222] rounded-lg {visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} transition-all duration-700" style="transition-delay: 200ms">
+        <div class="text-3xl font-bold text-[#e62020] mb-2">
+          {#if visible}
+            {formatNumber($count3)}{stats[2].suffix}
+          {:else}
+            0{stats[2].suffix}
+          {/if}
+        </div>
+        <div class="text-gray-400">{stats[2].label}</div>
+      </div>
+
+      <div class="text-center p-6 bg-[#222] rounded-lg {visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} transition-all duration-700" style="transition-delay: 300ms">
+        <div class="text-3xl font-bold text-[#e62020] mb-2">
+          {#if visible}
+            {formatNumber($count4)}{stats[3].suffix}
+          {:else}
+            0{stats[3].suffix}
+          {/if}
+        </div>
+        <div class="text-gray-400">{stats[3].label}</div>
+      </div>
     </div>
 
     <!-- Features -->

@@ -7,9 +7,24 @@
   let usernameOrEmail = '';
   let password = '';
 
+  // Fungsi untuk mendapatkan IP address
+  async function getIPAddress() {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return data.ip;
+    } catch (error) {
+      console.error('Error getting IP:', error);
+      return null;
+    }
+  }
+
   async function handleLogin() {
     try {
       loading = true;
+
+      // Dapatkan IP address
+      const ipAddress = await getIPAddress();
 
       const response = await fetch('/api/admin/login', {
         method: 'POST',
@@ -18,7 +33,8 @@
         },
         body: JSON.stringify({
           usernameOrEmail,
-          password
+          password,
+          ipAddress
         })
       });
 
@@ -39,7 +55,9 @@
         title: 'Error!',
         text: error.message || 'Gagal login',
         icon: 'error',
-        confirmButtonColor: '#e62020'
+        confirmButtonColor: '#e62020',
+        background: '#222',
+        color: '#fff'
       });
     } finally {
       loading = false;

@@ -14,13 +14,11 @@ export const load: PageServerLoad = async ({ params }) => {
     if (marketError) throw marketError;
     if (!market) throw error(404, 'Market tidak ditemukan');
 
-    // Ambil data lomba untuk market tersebut
-    const today = new Date().toISOString().split('T')[0];
+    // Ambil semua data lomba untuk market tersebut
     const { data: lomba, error: lombaError } = await supabaseClient
       .from('lomba')
       .select(`
         *,
-        id,
         markets (
           name,
           buka,
@@ -29,14 +27,13 @@ export const load: PageServerLoad = async ({ params }) => {
         )
       `)
       .eq('market_id', market.id)
-      .eq('tanggal', today);
+      .order('tanggal', { ascending: false }); // Urutkan berdasarkan tanggal terbaru
 
     if (lombaError) throw lombaError;
 
     return {
       market,
       lomba: lomba || [],
-      selectedDate: today
     };
   } catch (err) {
     console.error('Error loading market data:', err);

@@ -26,36 +26,60 @@
           data: chartData.values,
           borderColor: '#3b82f6',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 2,
           tension: 0.4,
-          fill: true
+          fill: true,
+          pointBackgroundColor: '#3b82f6',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#3b82f6',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+          mode: 'nearest',
+          axis: 'x',
+          intersect: false
+        },
         plugins: {
           legend: {
             display: false
           },
           tooltip: {
+            enabled: true,
             mode: 'index',
             intersect: false,
-            backgroundColor: '#1f2937',
+            backgroundColor: 'rgba(17, 24, 39, 0.95)',
             titleColor: '#9ca3af',
             bodyColor: '#fff',
             borderColor: '#374151',
             borderWidth: 1,
-            padding: 12,
+            padding: {
+              top: 10,
+              right: 15,
+              bottom: 10,
+              left: 15
+            },
             titleFont: {
-              size: 14,
-              weight: 'normal'
+              size: 13,
+              weight: 'normal',
+              family: "'Inter', sans-serif"
             },
             bodyFont: {
-              size: 14
+              size: 12,
+              family: "'Inter', sans-serif"
             },
+            displayColors: false,
             callbacks: {
               title: function(context) {
-                return context[0].label;
+                const title = context[0].label;
+                return `${title}`;
               },
               label: function(context) {
                 return `${context.parsed.y} user online`;
@@ -66,21 +90,55 @@
         scales: {
           x: {
             grid: {
-              display: false
+              display: true,
+              color: 'rgba(55, 65, 81, 0.1)',
+              drawTicks: false
             },
             ticks: {
-              color: '#9ca3af'
+              color: '#9ca3af',
+              font: {
+                size: 11,
+                family: "'Inter', sans-serif"
+              },
+              padding: 8,
+              maxRotation: 45,
+              minRotation: 45,
+              autoSkip: true,
+              maxTicksLimit: currentPeriod === 'daily' ? 7 : currentPeriod === 'monthly' ? 12 : 5
+            },
+            border: {
+              display: false
             }
           },
           y: {
             beginAtZero: true,
             grid: {
-              color: '#374151'
+              color: 'rgba(55, 65, 81, 0.1)',
+              drawTicks: false
+            },
+            border: {
+              display: false
             },
             ticks: {
               color: '#9ca3af',
-              stepSize: 1
+              font: {
+                size: 11,
+                family: "'Inter', sans-serif"
+              },
+              padding: 10,
+              stepSize: 1,
+              callback: function(value) {
+                return value + ' user';
+              }
             }
+          }
+        },
+        layout: {
+          padding: {
+            top: 20,
+            right: 20,
+            bottom: 20,
+            left: 20
           }
         }
       }
@@ -90,6 +148,14 @@
       chart.destroy();
     };
   });
+
+  // Reactive statement untuk update chart ketika data berubah
+  $: if (chart && chartData) {
+    chart.data.labels = chartData.labels;
+    chart.data.datasets[0].data = chartData.values;
+    chart.options.scales.x.ticks.maxTicksLimit = currentPeriod === 'daily' ? 7 : currentPeriod === 'monthly' ? 12 : 5;
+    chart.update('none'); // Gunakan 'none' untuk animasi yang lebih smooth
+  }
 </script>
 
 <div class="p-6">
@@ -159,32 +225,35 @@
 
   <!-- Chart Section -->
   <div class="mt-8 bg-[#222] rounded-xl border border-gray-800 p-6">
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-lg font-semibold text-white">Statistik User Online</h2>
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h2 class="text-lg font-semibold text-white">Statistik User Online</h2>
+        <p class="text-sm text-gray-400 mt-1">Jumlah user online berdasarkan periode waktu</p>
+      </div>
       
-      <div class="flex gap-2">
-        <button
-          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors {currentPeriod === 'daily' ? 'bg-blue-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
-          on:click={() => changePeriod('daily')}
+      <div class="relative">
+        <select 
+          class="bg-gray-800 text-gray-200 px-4 py-2.5 rounded-lg text-sm font-medium appearance-none pr-10 cursor-pointer hover:bg-gray-700 transition-colors border border-gray-700 focus:outline-none focus:border-blue-500"
+          value={currentPeriod}
+          on:change={(e: Event) => {
+            const target = e.target as HTMLSelectElement;
+            const newPeriod = target.value;
+            goto(`?period=${newPeriod}`, { keepFocus: true });
+          }}
         >
-          Harian
-        </button>
-        <button
-          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors {currentPeriod === 'monthly' ? 'bg-blue-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
-          on:click={() => changePeriod('monthly')}
-        >
-          Bulanan
-        </button>
-        <button
-          class="px-4 py-2 rounded-lg text-sm font-medium transition-colors {currentPeriod === 'yearly' ? 'bg-blue-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
-          on:click={() => changePeriod('yearly')}
-        >
-          Tahunan
-        </button>
+          <option value="daily">Harian</option>
+          <option value="monthly">Bulanan</option>
+          <option value="yearly">Tahunan</option>
+        </select>
+        <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
       </div>
     </div>
     
-    <div class="h-[400px]">
+    <div class="h-[400px] relative">
       <canvas bind:this={chartCanvas}></canvas>
     </div>
   </div>

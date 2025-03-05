@@ -13,11 +13,26 @@
   let showPassword = false;
   let loginAttempts = 0;
 
+  // Fungsi untuk mendapatkan IP address
+  async function getIPAddress() {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return data.ip;
+    } catch (error) {
+      console.error('Error getting IP:', error);
+      return null;
+    }
+  }
+
   async function handleLogin() {
     try {
       loading = true;
       errorMessage = '';
       isEmailUnconfirmed = false;
+
+      // Dapatkan IP address
+      const ipAddress = await getIPAddress();
 
       // Gunakan endpoint lokal untuk login
       const response = await fetch('/api/auth/login', {
@@ -27,7 +42,8 @@
         },
         body: JSON.stringify({
           identifier,
-          password
+          password,
+          ipAddress
         })
       });
 

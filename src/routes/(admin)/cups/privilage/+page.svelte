@@ -1,6 +1,7 @@
 <script lang="ts">
   import { supabaseClient } from '$lib/supabaseClient';
   import Swal from '$lib/utils/swal';
+  import { invalidate } from '$app/navigation';
 
   let loading = false;
   let searchQuery = '';
@@ -30,7 +31,8 @@
     'media social',
     'white list ip',
     'user agent',
-    'privilage'
+    'privilage',
+    'phoneemail'
   ];
 
   // Handle checkbox change
@@ -124,6 +126,9 @@
         .eq('id', editingPrivilage.id);
 
       if (error) throw error;
+
+      // Invalidate cache
+      await invalidate('app:privilage');
 
       await Swal.fire({
         title: 'Berhasil!',

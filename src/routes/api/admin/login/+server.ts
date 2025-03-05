@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 export async function POST({ request }) {
   try {
-    const { usernameOrEmail, password } = await request.json();
+    const { usernameOrEmail, password, ipAddress } = await request.json();
 
     if (!usernameOrEmail || !password) {
       return json(
@@ -16,40 +16,50 @@ export async function POST({ request }) {
       );
     }
 
-    // Login dengan Supabase Auth
+    // Cek dulu apakah user ada di tabel coretax
+    const { data: coretaxUser, error: coretaxError } = await supabaseAdmin
+      .from('coretax')
+      .select('*')
+      .or(`email.eq.${usernameOrEmail},username.eq.${usernameOrEmail}`)
+      .single();
+
+    if (coretaxError || !coretaxUser) {
+      return json(
+        { message: 'User tidak ditemukan' },
+        { status: 404 }
+      );
+    }
+
+    // Login dengan Supabase Auth menggunakan email dari data coretax
     const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
-      email: usernameOrEmail.includes('@') ? usernameOrEmail : 'boss.rangga23@gmail.com',
+      email: coretaxUser.email,
       password: password
     });
 
     if (authError) {
       return json(
-        { message: authError.message },
+        { message: 'Username/password salah' },
         { status: 401 }
       );
     }
 
-    // Ambil data dari coretax
-    const { data: userData, error: userError } = await supabaseAdmin
+    // Update alamat_ip dan last_login
+    const { error: updateError } = await supabaseAdmin
       .from('coretax')
-      .select('*')
-      .or(`email.eq."${usernameOrEmail}",username.eq."${usernameOrEmail}"`)
-      .single();
+      .update({
+        alamat_ip: ipAddress,
+        last_login: new Date().toISOString()
+      })
+      .eq('id', coretaxUser.id);
 
-    if (userError || !userData) {
-      return json(
-        { message: 'Data user tidak ditemukan' },
-        { status: 404 }
-      );
+    if (updateError) {
+      console.error('Error updating user data:', updateError);
     }
 
-    // Return data yang diperlukan
     return json({
+      message: 'Login berhasil',
       data: {
-        id: userData.id,
-        email: userData.email,
-        username: userData.username,
-        level: userData.level,
+        ...coretaxUser,
         access_token: authData.session?.access_token
       }
     });
@@ -57,7 +67,10 @@ export async function POST({ request }) {
   } catch (error) {
     console.error('Login error:', error);
     return json(
-      { message: 'Terjadi kesalahan pada server' },
+      { 
+        message: 'Terjadi kesalahan saat login. Silakan coba lagi.',
+        details: error.message 
+      },
       { status: 500 }
     );
   }

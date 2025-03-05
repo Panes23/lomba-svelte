@@ -17,14 +17,8 @@
   export let showSearch = true;
   export let showViewAll = false;
   
-  $: filteredMarkets = markets.filter(market => 
-    searchQuery 
-      ? market.name.toLowerCase().includes(searchQuery.toLowerCase())
-      : true
-  ).slice(0, limit || undefined);
-
-  // Sort filtered markets berdasarkan status dan waktu tutup
-  $: sortedAndFilteredMarkets = [...filteredMarkets].sort((a, b) => {
+  // Urutkan markets terlebih dahulu berdasarkan status dan waktu tutup
+  $: sortedMarkets = [...markets].sort((a, b) => {
     const statusA = getMarketStatusPriority(a);
     const statusB = getMarketStatusPriority(b);
     
@@ -32,7 +26,7 @@
     if (statusA !== statusB) return statusB - statusA;
     
     // Jika status sama dan BUKA, urutkan berdasarkan waktu tutup terdekat
-    if (statusA === 2) {
+    if (statusA === 2) { // Status BUKA
       const timeA = getMinutesUntilClose(a);
       const timeB = getMinutesUntilClose(b);
       return timeA - timeB;
@@ -41,10 +35,17 @@
     return 0;
   });
 
-  // Sort filtered markets dan terapkan limit jika ada
+  // Kemudian filter berdasarkan pencarian
+  $: filteredMarkets = sortedMarkets.filter(market => 
+    searchQuery 
+      ? market.name.toLowerCase().includes(searchQuery.toLowerCase())
+      : true
+  );
+
+  // Terakhir, terapkan limit jika ada
   $: displayedMarkets = limit 
-    ? sortedAndFilteredMarkets.slice(0, limit)
-    : sortedAndFilteredMarkets;
+    ? filteredMarkets.slice(0, limit)
+    : filteredMarkets;
 
   let showTerms = false;
   let selectedMarket = null;
@@ -153,7 +154,7 @@
 
   {#if loading}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {#each Array(6) as _, i}
+      {#each Array(limit || 8) as _, i}
         <div class="bg-gradient-to-br from-[#1a1a1a] to-[#222] rounded-2xl border border-gray-800/50 overflow-hidden shadow-xl shadow-black/20 backdrop-blur-sm">
           <!-- Skeleton Image -->
           <Skeleton className="aspect-video bg-gray-800" />

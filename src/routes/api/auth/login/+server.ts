@@ -5,9 +5,9 @@ import { SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL } from '$env/static/privat
 
 const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   try {
-    const { identifier, password } = await request.json();
+    const { identifier, password, ipAddress } = await request.json();
 
     if (!identifier || !password) {
       return json(
@@ -16,25 +16,41 @@ export const POST: RequestHandler = async ({ request }) => {
       );
     }
 
-    // Cek apakah user sudah ada di tabel users
-    const { data: existingUser } = await supabase
+    // Cek dulu apakah user ada di tabel users
+    const { data: existingUser, error: userError } = await supabase
       .from('users')
       .select('*')
       .or(`email.eq."${identifier}",username.eq."${identifier}"`)
       .single();
 
-    let authData;
+    if (userError && userError.code !== 'PGRST116') {
+      console.error('Error checking user:', userError);
+      return json(
+        { error: 'Terjadi kesalahan saat memeriksa user' },
+        { status: 500 }
+      );
+    }
 
-    // Coba login dengan email
-    authData = await supabase.auth.signInWithPassword({
-      email: existingUser?.email || identifier,
-      password
+    // Tentukan email yang akan digunakan untuk login
+    const loginEmail = existingUser?.email || (identifier.includes('@') ? identifier : `${identifier}@tebakangka.com`);
+
+    // Login dengan Supabase Auth menggunakan service role
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: password
     });
 
-    // Jika gagal login
-    if (!authData.data.user || !authData.data.session) {
+    if (authError) {
+      console.error('Auth error:', authError);
       return json(
         { error: 'Username/Email atau password salah' },
+        { status: 401 }
+      );
+    }
+
+    if (!authData.user || !authData.session) {
+      return json(
+        { error: 'Gagal mendapatkan data user' },
         { status: 401 }
       );
     }
@@ -44,57 +60,88 @@ export const POST: RequestHandler = async ({ request }) => {
       const { error: insertError } = await supabase
         .from('users')
         .insert({
-          id: authData.data.user.id,
+          id: authData.user.id,
           username: identifier.includes('@') ? identifier.split('@')[0] : identifier,
-          email: authData.data.user.email,
-          phone: '-',  // Default value untuk kolom not-null
-          birth_date: new Date().toISOString().split('T')[0], // Default value untuk kolom not-null
+          email: authData.user.email,
+          phone: '-',
+          birth_date: new Date().toISOString().split('T')[0],
           status: 'active',
-          auth_uid: authData.data.user.id,
+          auth_uid: authData.user.id,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          alamat_ip: ipAddress,
+          last_login: new Date().toISOString()
         });
 
       if (insertError) {
-        console.error('Error inserting user data:', insertError);
+        console.error('Error inserting user:', insertError);
         return json(
           { error: 'Gagal membuat data user' },
           { status: 500 }
         );
       }
-    } else if (existingUser.status === 'banned') {
-      return json(
-        { error: 'Akun Anda telah dibanned sementara waktu. Silakan hubungi admin untuk informasi lebih lanjut.' },
-        { status: 403 }
-      );
+    } else {
+      // Cek status user
+      if (existingUser.status === 'banned') {
+        return json(
+          { error: 'Akun Anda telah dibanned sementara waktu. Silakan hubungi admin untuk informasi lebih lanjut.' },
+          { status: 403 }
+        );
+      }
+
+      // Update IP dan last_login
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          alamat_ip: ipAddress,
+          last_login: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingUser.id);
+
+      if (updateError) {
+        console.error('Error updating user:', updateError);
+      }
     }
 
-    // Jika email belum dikonfirmasi
-    if (!authData.data.user.email_confirmed_at) {
-      return json(
-        { error: 'Email belum dikonfirmasi. Silakan cek email Anda untuk konfirmasi.' },
-        { status: 401 }
-      );
+    // Update data user online
+    const now = new Date();
+    const todayUTC = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate()
+    ));
+
+    const username = existingUser?.username || (identifier.includes('@') ? identifier.split('@')[0] : identifier);
+
+    try {
+      const { error: upsertError } = await supabase
+        .from('user_online')
+        .upsert({
+          username: username,
+          created_at: now.toISOString(),
+          updated_at: now.toISOString(),
+          login_date: todayUTC.toISOString().split('T')[0]
+        }, {
+          onConflict: 'username,login_date'
+        });
+
+      if (upsertError) {
+        console.error('Error updating online status:', upsertError);
+      }
+    } catch (error) {
+      console.error('Error managing online record:', error);
     }
 
-    // Simpan data user online
-    const { error: insertError } = await supabase
-      .from('user_online')
-      .upsert({
-        username: existingUser.username,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'username'
-      });
-
-    if (insertError) {
-      console.error('Error saving online user:', insertError);
-    }
-
-    return json({ 
-      session: authData.data.session, 
-      user: authData.data.user 
+    // Return session dan user data
+    return json({
+      session: authData.session,
+      user: {
+        ...authData.user,
+        username: username
+      }
     });
+
   } catch (error) {
     console.error('Login error:', error);
     return json(

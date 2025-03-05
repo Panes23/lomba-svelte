@@ -2,11 +2,18 @@ import { supabaseClient } from '$lib/supabaseClient';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ url }) => {
   try {
+    const lombaId = url.searchParams.get('lomba_id');
+    
+    if (!lombaId) {
+      return json({ error: 'Lomba ID is required' }, { status: 400 });
+    }
+
     const { data, error } = await supabaseClient
-      .from('markets')
-      .select('*');
+      .from('tebakan')
+      .select('userid_website')
+      .eq('lomba_id', lombaId);
 
     if (error) throw error;
 
@@ -18,7 +25,7 @@ export const GET: RequestHandler = async () => {
       }
     });
   } catch (err) {
-    console.error('Error fetching markets:', err);
-    return json({ error: 'Failed to fetch markets' }, { status: 500 });
+    console.error('Error fetching tebakan:', err);
+    return json({ error: 'Failed to fetch tebakan' }, { status: 500 });
   }
 }; 

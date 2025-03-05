@@ -276,14 +276,15 @@
             <th class="px-4 py-3">Email</th>
             <th class="px-4 py-3">Level</th>
             <th class="px-4 py-3">Created At</th>
-            <th class="px-4 py-3">Updated At</th>
+            <th class="px-4 py-3">Last Login</th>
+            <th class="px-4 py-3">IP Address</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-800">
           {#if loading}
             {#each Array(5) as _}
               <tr class="animate-pulse">
-                {#each Array(5) as _}
+                {#each Array(6) as _}
                   <td class="px-4 py-3">
                     <div class="h-4 bg-gray-800 rounded w-24"></div>
                   </td>
@@ -297,7 +298,8 @@
                 <td class="px-4 py-3">{user?.email || '-'}</td>
                 <td class="px-4 py-3">{user?.level || '-'}</td>
                 <td class="px-4 py-3">{formatDate(user?.created_at)}</td>
-                <td class="px-4 py-3">{formatDate(user?.updated_at)}</td>
+                <td class="px-4 py-3">{formatDate(user?.last_login)}</td>
+                <td class="px-4 py-3">{user?.alamat_ip || '-'}</td>
               </tr>
             {/each}
           {/if}

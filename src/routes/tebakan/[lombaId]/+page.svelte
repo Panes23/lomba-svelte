@@ -395,6 +395,16 @@
     // Batasi jumlah pemenang sesuai max_winner
     .slice(0, lomba.max_winner)
     : [];
+
+  // Fungsi untuk memformat ID pengguna
+  function formatUserId(userId: string): string {
+    if (!userId) return '';
+    if (userId.length <= 4) return userId;
+    
+    const visiblePart = userId.slice(0, 4);
+    const hiddenPart = 'x'.repeat(userId.length - 4);
+    return `${visiblePart}${hiddenPart}`;
+  }
 </script>
 
 <svelte:head>
@@ -527,7 +537,7 @@
                           <span class="text-[#FFD700] text-xs sm:text-sm font-bold">#{index + 1}</span>
                         </div>
                         <div>
-                          <p class="text-white text-sm sm:text-base font-medium">{winner.userid_website}</p>
+                          <p class="text-white text-sm sm:text-base font-medium">{formatUserId(winner.userid_website)}</p>
                           <div class="flex items-center gap-2">
                             <a 
                               href={winner.websites.link_website} 
@@ -649,7 +659,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
                         </a>
-                        <p class="text-[11px] text-gray-500 mt-0.5">ID: <span class="text-white font-medium">{item.userid_website}</span></p>
+                        <p class="text-[11px] text-gray-500 mt-0.5">ID: <span class="text-white font-medium">{formatUserId(item.userid_website)}</span></p>
                       {:else}
                         <div class="h-5 w-24 bg-gray-800 animate-pulse rounded"></div>
                       {/if}

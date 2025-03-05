@@ -5,10 +5,14 @@
   let loading = false;
   let searchQuery = '';
   let currentPage = 1;
+  let dateFilter = '';
+  let filterColumn = 'created_at';
   const itemsPerPage = 8;
 
   export let data;
   $: users = data.users;
+  $: userAccess = data.userAccess || [];
+  $: hidePhoneEmail = userAccess.includes('phoneemail');
 
   // Pagination logic
   $: totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
@@ -17,23 +21,51 @@
     currentPage * itemsPerPage
   );
   
-  // Reset page when search changes
-  $: if (searchQuery) currentPage = 1;
+  // Reset page when search or date filter changes
+  $: if (searchQuery || dateFilter) currentPage = 1;
 
-  // Format tanggal
+  // Format tanggal untuk input date
+  function formatDateForInput(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  }
+
+  // Format tanggal untuk display
   function formatDate(dateString) {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('id-ID', {
       day: 'numeric',
       month: 'long',
-      year: 'numeric'
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
     });
   }
 
   // Filter users
-  $: filteredUsers = users.filter(item => 
-    item.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  $: filteredUsers = users.filter(item => {
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = 
+      (item.username?.toLowerCase().includes(searchLower) ||
+      item.email?.toLowerCase().includes(searchLower) ||
+      item.phone?.toLowerCase().includes(searchLower));
+    
+    if (dateFilter) {
+      const itemDate = formatDateForInput(item[filterColumn]);
+      return matchesSearch && itemDate === dateFilter;
+    }
+    
+    return matchesSearch;
+  });
+
+  // Reset filter
+  function resetFilter() {
+    dateFilter = '';
+    searchQuery = '';
+    currentPage = 1;
+  }
 
   // Fungsi untuk mengubah status user
   async function toggleUserStatus(userId: string, currentStatus: string) {
@@ -108,13 +140,39 @@
 <div class="space-y-6 px-6 py-10">
   <div class="flex items-center justify-between">
     <h1 class="text-2xl font-bold text-white">List Users</h1>
-    <div class="w-64">
-      <input
-        type="text"
-        bind:value={searchQuery}
-        placeholder="Cari user..."
-        class="w-full bg-[#222] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
-      />
+    <div class="flex items-center gap-4">
+      <!-- Filter Date -->
+      <div class="flex items-center gap-2">
+        <select
+          bind:value={filterColumn}
+          class="bg-[#222] text-white px-3 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
+        >
+          <option value="created_at">Created At</option>
+          <option value="last_login">Last Login</option>
+        </select>
+        <input
+          type="date"
+          bind:value={dateFilter}
+          class="bg-[#222] text-white px-3 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
+        />
+        {#if dateFilter || searchQuery}
+          <button
+            on:click={resetFilter}
+            class="px-3 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            Reset
+          </button>
+        {/if}
+      </div>
+      <!-- Search -->
+      <div class="w-64">
+        <input
+          type="text"
+          bind:value={searchQuery}
+          placeholder="Cari user..."
+          class="w-full bg-[#222] text-white px-4 py-2 rounded-lg border border-gray-800 focus:outline-none focus:border-[#e62020]"
+        />
+      </div>
     </div>
   </div>
 
@@ -125,11 +183,14 @@
           <tr class="bg-[#2a2a2a] text-gray-400 text-sm">
             <th class="px-4 py-3">Status</th>
             <th class="px-4 py-3">Username</th>
-            <th class="px-4 py-3">Email</th>
-            <th class="px-4 py-3">Phone</th>
+            {#if hidePhoneEmail}
+              <th class="px-4 py-3">Email</th>
+              <th class="px-4 py-3">Phone</th>
+            {/if}
             <th class="px-4 py-3">Birth Date</th>
             <th class="px-4 py-3">Created At</th>
-            <th class="px-4 py-3">Updated At</th>
+            <th class="px-4 py-3">Last Login</th>
+            <th class="px-4 py-3">IP Address</th>
             <th class="px-4 py-3">Action</th>
           </tr>
         </thead>
@@ -137,7 +198,7 @@
           {#if loading}
             {#each Array(5) as _}
               <tr class="animate-pulse">
-                {#each Array(8) as _}
+                {#each Array(hidePhoneEmail ? 9 : 7) as _}
                   <td class="px-4 py-3">
                     <div class="h-4 bg-gray-800 rounded w-24"></div>
                   </td>
@@ -156,11 +217,14 @@
                   </span>
                 </td>
                 <td class="px-4 py-3">{user.username || '-'}</td>
-                <td class="px-4 py-3">{user.email || '-'}</td>
-                <td class="px-4 py-3">{user.phone || '-'}</td>
+                {#if hidePhoneEmail}
+                  <td class="px-4 py-3">{user.email || '-'}</td>
+                  <td class="px-4 py-3">{user.phone || '-'}</td>
+                {/if}
                 <td class="px-4 py-3">{formatDate(user.birth_date)}</td>
                 <td class="px-4 py-3">{formatDate(user.created_at)}</td>
-                <td class="px-4 py-3">{formatDate(user.updated_at)}</td>
+                <td class="px-4 py-3">{formatDate(user.last_login)}</td>
+                <td class="px-4 py-3">{user.alamat_ip || '-'}</td>
                 <td class="px-4 py-3">
                   <button
                     on:click={() => toggleUserStatus(user.id, user.status || 'active')}
